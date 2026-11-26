@@ -41,8 +41,10 @@ jobs:
       - name: Run unit tests
         run: npm test
 
-      - name: TypeScript typecheck
-        run: npx tsc --noEmit
+      - name: Generate Next.js route types & TypeScript check
+        run: |
+          npx next typegen
+          npx tsc --noEmit
 
       - name: ESLint check
         run: npm run lint
