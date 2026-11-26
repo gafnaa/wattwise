@@ -5,6 +5,7 @@
 ## Dokumentasi
 - [Product Requirements Document (PRD.md)](./PRD.md)
 - [Technical Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)
+- [ML Pipeline & Google Colab Guide (ml/README.md)](./ml/README.md)
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router) + TypeScript
@@ -35,6 +36,8 @@ Buka [http://localhost:3000](http://localhost:3000) di browser.
 - `npm run dev` / `npm run dev:webpack` — Menjalankan development server
 - `npm run build` / `npm run build:webpack` — Build produksi
 - `npm run lint` — Menjalankan ESLint
+- `npm test` — Menjalankan unit test ML Random Forest & Audit Engine
+- `npm run ml:train` — Regenerasi model baseline `src/lib/ml/rf-model.json`
 - `npm run db:generate` — Generate Prisma Client
 - `npm run db:push` — Push skema Prisma ke PostgreSQL
 - `npm run db:migrate` — Jalankan migrasi Prisma

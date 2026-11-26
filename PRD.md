@@ -200,8 +200,8 @@ Pengembangan dilakukan secara bertahap agar siap untuk demonstrasi **Hackathon D
 
 ### Tahap 2 — Purwarupa Software & ML (Menuju 29 Nov 2026)
 - [x] Implementasi UI Login & Dashboard *Smart Audit* (shadcn/ui) sesuai mockup Lampiran 5
-- [ ] Implementasi simulator data sensor & kalkulasi Virtual Sensor + biaya (Rp)
-- [ ] Implementasi model klasifikasi **Random Forest** (`OFF`, `START-UP`, `IDLE`, `WORKING`)
+- [x] Implementasi simulator data sensor & kalkulasi Virtual Sensor + biaya (Rp)
+- [x] Implementasi model klasifikasi **Random Forest** (`OFF`, `START-UP`, `IDLE`, `WORKING`) & Google Colab notebook
 - [ ] Implementasi **Simulator "What-If"** & integrasi **Telegram Bot (`WattWise Bot`)**
 
 ### Tahap 3 — Integrasi Hardware–Software & Hackathon Day (29 Nov – 6 Des 2026)
