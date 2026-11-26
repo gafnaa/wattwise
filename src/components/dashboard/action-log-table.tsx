@@ -1,15 +1,10 @@
 "use client";
 
 import * as React from "react";
-import { CheckCircle2, Clock3, Sparkles } from "lucide-react";
+import { CheckCircle2, Clock3 } from "lucide-react";
+import { TextMorph } from "torph/react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   Table,
   TableBody,
@@ -18,20 +13,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import {
-  formatRupiah,
-  type ActionLogItem,
-} from "@/lib/mock-dashboard-data";
+import { formatRupiah, type ActionLogItem } from "@/lib/mock-dashboard-data";
 
 interface ActionLogTableProps {
   logs: ActionLogItem[];
-  searchQuery: string;
+  searchQuery?: string;
   onToggleStatus: (id: string) => void;
 }
 
 export function ActionLogTable({
   logs,
-  searchQuery,
+  searchQuery = "",
   onToggleStatus,
 }: ActionLogTableProps) {
   const filteredLogs = React.useMemo(() => {
@@ -53,45 +45,40 @@ export function ActionLogTable({
   );
 
   return (
-    <Card className="flex h-full flex-col border-border/80 bg-card/90 shadow-lg shadow-black/25">
-      <CardHeader className="flex flex-col gap-2 pb-3 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2 text-sm font-semibold text-white">
-            <Sparkles className="size-4 text-orange-400" />
-            Log Tindakan Otomatisasi &amp; Rekomendasi AI
-          </CardTitle>
-          <CardDescription className="text-xs text-muted-foreground">
-            Klik status untuk menandai tindakan yang sudah diterapkan di bengkel
-          </CardDescription>
-        </div>
+    <Card className="border-border/80 bg-card/90">
+      <CardHeader className="flex flex-row items-center justify-between gap-2 pb-3">
+        <CardTitle className="text-sm font-semibold text-white">
+          Daftar Tindakan
+        </CardTitle>
 
         <Badge
           variant="outline"
-          className="w-fit border-emerald-500/35 bg-emerald-500/10 font-mono text-[11px] text-emerald-300"
+          className="border-emerald-500/35 bg-emerald-500/10 font-mono text-[11px] text-emerald-300"
         >
-          Terealisasi: {formatRupiah(completedSavings)}/bln
+          Terealisasi:{" "}
+          <TextMorph>{`${formatRupiah(completedSavings)}/bln`}</TextMorph>
         </Badge>
       </CardHeader>
 
-      <CardContent className="flex-1">
+      <CardContent>
         <div className="overflow-x-auto rounded-xl border border-border/70 bg-background/50">
           <Table>
             <TableHeader>
               <TableRow className="border-border/70 hover:bg-transparent">
-                <TableHead className="w-[76px] text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  Tanggal
+                <TableHead className="w-[72px] text-[11px] uppercase">
+                  Tgl
                 </TableHead>
-                <TableHead className="w-[150px] text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  Mesin Furnitur
+                <TableHead className="w-[150px] text-[11px] uppercase">
+                  Mesin
                 </TableHead>
-                <TableHead className="text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  Rekomendasi Aksi
+                <TableHead className="text-[11px] uppercase">
+                  Tindakan
                 </TableHead>
-                <TableHead className="w-[110px] text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
+                <TableHead className="w-[105px] text-[11px] uppercase">
                   Status
                 </TableHead>
-                <TableHead className="w-[125px] text-right text-[11px] font-semibold tracking-wider text-zinc-400 uppercase">
-                  Hemat / Bln
+                <TableHead className="w-[120px] text-right text-[11px] uppercase">
+                  Hemat/Bln
                 </TableHead>
               </TableRow>
             </TableHeader>
@@ -100,14 +87,14 @@ export function ActionLogTable({
                 <TableRow>
                   <TableCell
                     colSpan={5}
-                    className="h-24 text-center text-xs text-muted-foreground"
+                    className="h-20 text-center text-xs text-zinc-500"
                   >
-                    Tidak ada log rekomendasi yang cocok dengan pencarian.
+                    Tidak ada tindakan.
                   </TableCell>
                 </TableRow>
               ) : (
                 filteredLogs.map((log) => {
-                  const isCompleted = log.status === "COMPLETED";
+                  const done = log.status === "COMPLETED";
                   return (
                     <TableRow
                       key={log.id}
@@ -116,10 +103,10 @@ export function ActionLogTable({
                       <TableCell className="font-mono text-xs text-zinc-400">
                         {log.dateLabel}
                       </TableCell>
-                      <TableCell className="text-xs font-medium text-zinc-100">
+                      <TableCell className="text-xs font-medium text-white">
                         {log.machineName}
                       </TableCell>
-                      <TableCell className="max-w-[260px] text-xs whitespace-normal text-zinc-300">
+                      <TableCell className="max-w-[280px] text-xs whitespace-normal text-zinc-300">
                         {log.recommendation}
                       </TableCell>
                       <TableCell>
@@ -127,15 +114,14 @@ export function ActionLogTable({
                           type="button"
                           onClick={() => onToggleStatus(log.id)}
                           className="focus-visible:outline-none"
-                          title="Klik untuk ubah status penerapan"
                         >
-                          {isCompleted ? (
-                            <Badge className="cursor-pointer border border-emerald-500/35 bg-emerald-500/15 text-[11px] text-emerald-300 hover:bg-emerald-500/25">
+                          {done ? (
+                            <Badge className="cursor-pointer border border-emerald-500/35 bg-emerald-500/15 text-[11px] text-emerald-300">
                               <CheckCircle2 className="mr-1 size-3" />
                               Selesai
                             </Badge>
                           ) : (
-                            <Badge className="cursor-pointer border border-amber-500/35 bg-amber-500/15 text-[11px] text-amber-300 hover:bg-amber-500/25">
+                            <Badge className="cursor-pointer border border-amber-500/35 bg-amber-500/15 text-[11px] text-amber-300">
                               <Clock3 className="mr-1 size-3" />
                               Pending
                             </Badge>

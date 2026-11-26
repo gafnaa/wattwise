@@ -2,13 +2,7 @@
 
 import { Cpu, Radio } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import type { SettingsMachineItem } from "@/app/api/settings/route";
 import type { PortfolioQuadrant } from "@/lib/mock-dashboard-data";
 
@@ -21,46 +15,41 @@ const QUADRANTS: Array<{
   key: PortfolioQuadrant;
   roman: string;
   title: string;
-  subtitle: string;
-  sensorAdvice: string;
+  advice: string;
   accentClass: string;
   badgeClass: string;
 }> = [
   {
     key: "LEVERAGE_POWER",
     roman: "I",
-    title: "Leverage Power Demand",
-    subtitle: "Daya tinggi • Jam operasi rendah",
-    sensorAdvice: "Sensor selektif",
-    accentClass: "border-amber-500/30 bg-amber-950/15",
-    badgeClass: "border-amber-500/40 bg-amber-500/15 text-amber-300",
+    title: "Leverage Power",
+    advice: "Sensor selektif",
+    accentClass: "border-amber-500/25 bg-amber-950/10",
+    badgeClass: "border-amber-500/35 bg-amber-500/10 text-amber-300",
   },
   {
     key: "CRITICAL",
     roman: "II",
     title: "Critical Machine",
-    subtitle: "Daya tinggi • Jam operasi tinggi",
-    sensorAdvice: "Wajib PZEM-004T",
-    accentClass: "border-rose-500/35 bg-rose-950/20",
-    badgeClass: "border-rose-500/40 bg-rose-500/15 text-rose-300",
+    advice: "Wajib PZEM-004T",
+    accentClass: "border-rose-500/30 bg-rose-950/15",
+    badgeClass: "border-rose-500/35 bg-rose-500/10 text-rose-300",
   },
   {
     key: "NONCRITICAL",
     roman: "IV",
     title: "Noncritical",
-    subtitle: "Daya rendah • Jam operasi rendah",
-    sensorAdvice: "Virtual Sensor (CT)",
-    accentClass: "border-sky-500/30 bg-sky-950/15",
-    badgeClass: "border-sky-500/40 bg-sky-500/15 text-sky-300",
+    advice: "Virtual CT",
+    accentClass: "border-sky-500/25 bg-sky-950/10",
+    badgeClass: "border-sky-500/35 bg-sky-500/10 text-sky-300",
   },
   {
     key: "LEVERAGE_TIME",
     roman: "III",
-    title: "Leverage Operating Time",
-    subtitle: "Daya rendah • Jam operasi tinggi",
-    sensorAdvice: "Pantau durasi idle",
-    accentClass: "border-emerald-500/30 bg-emerald-950/15",
-    badgeClass: "border-emerald-500/40 bg-emerald-500/15 text-emerald-300",
+    title: "Leverage Time",
+    advice: "Pantau idle",
+    accentClass: "border-emerald-500/25 bg-emerald-950/10",
+    badgeClass: "border-emerald-500/35 bg-emerald-500/10 text-emerald-300",
   },
 ];
 
@@ -69,22 +58,17 @@ export function MatrixEnergyPortfolio({
   onSelectMachine,
 }: MatrixEnergyPortfolioProps) {
   return (
-    <Card className="border-border/80 bg-card/90 shadow-lg shadow-black/25">
+    <Card className="border-border/80 bg-card/90">
       <CardHeader className="pb-3">
         <CardTitle className="text-sm font-semibold text-white">
-          Matrix Energy Portfolio (Thiede et al., 2013)
+          Matrix Energy Portfolio
         </CardTitle>
-        <CardDescription className="text-xs text-muted-foreground">
-          Pemetaan prioritas pemasangan sensor fisik PZEM-004T vs Virtual Sensor
-          berdasarkan Daya Nominal (kW) &amp; Jam Operasi Tahunan. Klik mesin
-          untuk mengedit parameter.
-        </CardDescription>
       </CardHeader>
 
       <CardContent className="space-y-2">
-        <div className="flex items-center justify-between text-[11px] text-zinc-400">
-          <span>↑ Daya Nominal Tinggi (&ge; 3,0 kW)</span>
-          <span>Jam Operasi Tinggi (&ge; 1.600 jam/thn) →</span>
+        <div className="flex items-center justify-between text-[11px] text-zinc-500">
+          <span>↑ Daya &ge; 3 kW</span>
+          <span>Jam Operasi &ge; 1.600 jam/thn →</span>
         </div>
 
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
@@ -93,36 +77,29 @@ export function MatrixEnergyPortfolio({
             return (
               <div
                 key={q.key}
-                className={`flex min-h-[145px] flex-col justify-between rounded-xl border p-3.5 ${q.accentClass}`}
+                className={`flex min-h-[126px] flex-col justify-between rounded-xl border p-3.5 ${q.accentClass}`}
               >
                 <div>
-                  <div className="flex items-start justify-between gap-2">
+                  <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2">
-                      <span className="flex size-6 items-center justify-center rounded-full border border-white/15 bg-background/80 font-mono text-xs font-bold text-white">
+                      <span className="flex size-5 items-center justify-center rounded-full border border-white/15 bg-background/80 font-mono text-[11px] font-bold text-white">
                         {q.roman}
                       </span>
-                      <div>
-                        <p className="text-xs font-semibold text-white">
-                          {q.title}
-                        </p>
-                        <p className="text-[10px] text-zinc-400">
-                          {q.subtitle}
-                        </p>
-                      </div>
+                      <span className="text-xs font-semibold text-white">
+                        {q.title}
+                      </span>
                     </div>
                     <Badge
                       variant="outline"
                       className={`text-[10px] ${q.badgeClass}`}
                     >
-                      {q.sensorAdvice}
+                      {q.advice}
                     </Badge>
                   </div>
 
                   <div className="mt-3 flex flex-wrap gap-1.5">
                     {list.length === 0 ? (
-                      <span className="text-[11px] text-zinc-500 italic">
-                        Belum ada mesin pada kuadran ini
-                      </span>
+                      <span className="text-[11px] text-zinc-600">—</span>
                     ) : (
                       list.map((m) => (
                         <button
@@ -136,8 +113,8 @@ export function MatrixEnergyPortfolio({
                           ) : (
                             <Cpu className="size-3 text-sky-400" />
                           )}
-                          <span className="font-medium">{m.name}</span>
-                          <span className="font-mono text-[10px] text-zinc-400">
+                          <span>{m.name}</span>
+                          <span className="font-mono text-[10px] text-zinc-500">
                             {(m.ratedPowerW / 1000).toFixed(1)} kW
                           </span>
                         </button>
@@ -145,10 +122,6 @@ export function MatrixEnergyPortfolio({
                     )}
                   </div>
                 </div>
-
-                <p className="mt-3 text-right font-mono text-[10px] text-zinc-500">
-                  {list.length} mesin
-                </p>
               </div>
             );
           })}
