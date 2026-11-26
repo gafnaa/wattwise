@@ -15,6 +15,7 @@ import {
   generateMachineRecommendations,
   shouldTriggerUrgentIdleAlert,
 } from "../audit/recommendations";
+import { classifyEnergyPortfolioQuadrant } from "../audit/portfolio";
 import { calculateVirtualSensorPower } from "../audit/virtual-sensor";
 import {
   applyHysteresis,
@@ -262,4 +263,32 @@ test("Recommendations engine and Telegram 30-min alert cooldown work properly", 
     projectedMonthlySavingIdr: 1_449_990,
   });
   assert.match(summaryMsg, /Laporan Hemat Energi/);
+});
+
+test("Matrix Energy Portfolio classifies all 4 quadrants and recommends Virtual CT for Noncritical", () => {
+  const critical = classifyEnergyPortfolioQuadrant({
+    ratedPowerW: 5500,
+    annualOperatingHours: 2400,
+  });
+  assert.equal(critical.quadrant, "CRITICAL");
+  assert.equal(critical.recommendedPhysicalSensor, true);
+
+  const levPower = classifyEnergyPortfolioQuadrant({
+    ratedPowerW: 3700,
+    annualOperatingHours: 1200,
+  });
+  assert.equal(levPower.quadrant, "LEVERAGE_POWER");
+
+  const levTime = classifyEnergyPortfolioQuadrant({
+    ratedPowerW: 2200,
+    annualOperatingHours: 2200,
+  });
+  assert.equal(levTime.quadrant, "LEVERAGE_TIME");
+
+  const noncrit = classifyEnergyPortfolioQuadrant({
+    ratedPowerW: 1200,
+    annualOperatingHours: 800,
+  });
+  assert.equal(noncrit.quadrant, "NONCRITICAL");
+  assert.equal(noncrit.recommendedPhysicalSensor, false);
 });

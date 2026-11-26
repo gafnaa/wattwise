@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Activity,
@@ -381,7 +382,10 @@ export function DashboardShell() {
                     Status ESP32 ({WORKSHOP_INFO.esp32OnlineCount}/
                     {WORKSHOP_INFO.esp32TotalCount} Online)
                   </DropdownMenuItem>
-                  <DropdownMenuItem className="text-xs">
+                  <DropdownMenuItem
+                    render={<Link href="/settings" />}
+                    className="text-xs"
+                  >
                     <Settings className="mr-2 size-3.5 text-zinc-400" />
                     Tarif &amp; Matrix Portfolio
                   </DropdownMenuItem>
@@ -453,6 +457,16 @@ export function DashboardShell() {
             >
               <Download className="mr-1.5 size-3.5 text-orange-400" />
               Ekspor Data
+            </Button>
+
+            <Button
+              variant="outline"
+              size="sm"
+              render={<Link href="/settings" />}
+              className="h-8 border-border/80 bg-background/70 text-xs text-zinc-200 hover:bg-muted"
+            >
+              <Settings className="mr-1.5 size-3.5 text-zinc-400" />
+              Pengaturan
             </Button>
 
             {/* Period Selector */}
