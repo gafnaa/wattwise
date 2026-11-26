@@ -9,6 +9,8 @@
     "build:webpack": "next build --webpack",
     "start": "next start",
     "lint": "eslint",
+    "test": "tsx --test src/lib/__tests__/*.test.ts",
+    "ml:train": "tsx ml/train-baseline.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
