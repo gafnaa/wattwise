@@ -39,7 +39,12 @@ export function WhatIfSimulator({
   const [idleReductionMin, setIdleReductionMin] = React.useState(30);
   const [startupReductionPct, setStartupReductionPct] = React.useState(35);
   const [telegramOpen, setTelegramOpen] = React.useState(false);
-  const [sentToTelegram, setSentToTelegram] = React.useState(false);
+  const [sendingTelegram, setSendingTelegram] = React.useState(false);
+  const [telegramResult, setTelegramResult] = React.useState<{
+    ok: boolean;
+    mode?: "live" | "simulated";
+    error?: string;
+  } | null>(null);
 
   const savings = React.useMemo(
     () =>
@@ -53,11 +58,38 @@ export function WhatIfSimulator({
     [idleReductionMin, startupReductionPct, machines]
   );
 
-  function handleSendTelegram() {
-    setSentToTelegram(true);
-    window.setTimeout(() => {
-      setSentToTelegram(false);
-    }, 3500);
+  async function handleSendTelegram() {
+    setSendingTelegram(true);
+    setTelegramResult(null);
+    try {
+      const res = await fetch("/api/telegram/send-report", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          idleReductionMinPerDay: idleReductionMin,
+          startupReductionPct,
+          projectedMonthlySavingIdr: savings.totalSavingIdr,
+          currentIdleLossIdr,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        mode?: "live" | "simulated";
+        error?: string;
+      };
+      setTelegramResult({
+        ok: Boolean(res.ok && data.ok),
+        mode: data.mode,
+        error: data.error,
+      });
+    } catch {
+      setTelegramResult({
+        ok: false,
+        error: "Gagal menghubungi server Telegram.",
+      });
+    } finally {
+      setSendingTelegram(false);
+    }
   }
 
   return (
@@ -229,23 +261,44 @@ export function WhatIfSimulator({
             </div>
           </div>
 
+          {telegramResult && (
+            <div
+              className={`rounded-lg border px-3 py-2 text-xs ${
+                telegramResult.ok
+                  ? "border-emerald-500/35 bg-emerald-500/10 text-emerald-300"
+                  : "border-rose-500/35 bg-rose-500/10 text-rose-300"
+              }`}
+            >
+              {telegramResult.ok
+                ? telegramResult.mode === "live"
+                  ? "Laporan berhasil dikirim langsung ke Telegram Bot pemilik bengkel."
+                  : "Laporan berhasil diproses (Mode Simulasi — isi TELEGRAM_BOT_TOKEN & TELEGRAM_DEFAULT_CHAT_ID di .env untuk pengiriman nyata)."
+                : `Pengiriman gagal: ${telegramResult.error ?? "kesalahan tidak diketahui"}`}
+            </div>
+          )}
+
           <DialogFooter>
             <Button
               type="button"
               variant="outline"
               onClick={() => setTelegramOpen(false)}
             >
-              Batal
+              Tutup
             </Button>
             <Button
               type="button"
+              disabled={sendingTelegram}
               onClick={handleSendTelegram}
               className="bg-sky-600 text-white hover:bg-sky-500"
             >
-              {sentToTelegram ? (
+              {sendingTelegram ? (
+                "Mengirim..."
+              ) : telegramResult?.ok ? (
                 <>
                   <Check className="mr-1.5 size-4" />
-                  Laporan Terkirim (Simulasi)
+                  {telegramResult.mode === "live"
+                    ? "Terkirim ke Telegram"
+                    : "Terkirim (Simulasi)"}
                 </>
               ) : (
                 <>

@@ -202,7 +202,7 @@ Pengembangan dilakukan secara bertahap agar siap untuk demonstrasi **Hackathon D
 - [x] Implementasi UI Login & Dashboard *Smart Audit* (shadcn/ui) sesuai mockup Lampiran 5
 - [x] Implementasi simulator data sensor & kalkulasi Virtual Sensor + biaya (Rp)
 - [x] Implementasi model klasifikasi **Random Forest** (`OFF`, `START-UP`, `IDLE`, `WORKING`) & Google Colab notebook
-- [ ] Implementasi **Simulator "What-If"** & integrasi **Telegram Bot (`WattWise Bot`)**
+- [x] Implementasi **Simulator "What-If"** & integrasi **Telegram Bot (`WattWise Bot`)** + Backend API Routes
 
 ### Tahap 3 — Integrasi Hardware–Software & Hackathon Day (29 Nov – 6 Des 2026)
 - [ ] Integrasi payload nyata dari node **ESP32 + PZEM-004T**

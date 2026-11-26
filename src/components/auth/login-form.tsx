@@ -33,8 +33,28 @@ export function LoginForm() {
   const [showPassword, setShowPassword] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [hardwareOnline, setHardwareOnline] = React.useState({
+    connected: true,
+    esp32Online: 7,
+    esp32Total: 7,
+  });
 
-  function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+  React.useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me")
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (active && data?.hardwareStatus) {
+          setHardwareOnline(data.hardwareStatus);
+        }
+      })
+      .catch(() => {});
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError(null);
 
@@ -44,24 +64,35 @@ export function LoginForm() {
     }
 
     setIsSubmitting(true);
-    // Simulasi autentikasi UI sebelum terhubung ke API /api/auth/login
-    window.setTimeout(() => {
-      const validDemo =
-        (username.trim().toLowerCase() === "owner" &&
-          password === "wattwise123") ||
-        (username.trim().toLowerCase() === "teknisi" &&
-          password === "teknisi123");
+    try {
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          username: username.trim(),
+          password,
+          rememberMe,
+        }),
+      });
+      const data = (await res.json().catch(() => ({}))) as {
+        ok?: boolean;
+        error?: string;
+      };
 
-      if (!validDemo) {
+      if (!res.ok || !data.ok) {
         setError(
-          "Kredensial tidak cocok. Gunakan akun demo: owner / wattwise123"
+          data.error ??
+            "Kredensial tidak cocok. Gunakan akun demo: owner / wattwise123"
         );
         setIsSubmitting(false);
         return;
       }
 
       router.push("/dashboard");
-    }, 350);
+    } catch {
+      setError("Gagal terhubung ke server autentikasi.");
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -218,13 +249,34 @@ export function LoginForm() {
 
       {/* Live Hardware Status Indicator (sesuai Lampiran 5 Gambar 5.1) */}
       <div className="mt-6 flex items-center justify-end gap-2 text-[11px] text-zinc-400">
-        <Radio className="size-3.5 text-emerald-400" />
-        <span>Sistem Terhubung</span>
-        <span className="relative flex size-2">
-          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-          <span className="relative inline-flex size-2 rounded-full bg-emerald-500" />
+        <Radio
+          className={`size-3.5 ${
+            hardwareOnline.connected ? "text-emerald-400" : "text-zinc-500"
+          }`}
+        />
+        <span>
+          {hardwareOnline.connected
+            ? "Sistem Terhubung"
+            : "Menunggu Koneksi Node"}
         </span>
-        <span className="font-medium text-emerald-400">ESP32 Online</span>
+        <span className="relative flex size-2">
+          {hardwareOnline.connected && (
+            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+          )}
+          <span
+            className={`relative inline-flex size-2 rounded-full ${
+              hardwareOnline.connected ? "bg-emerald-500" : "bg-zinc-500"
+            }`}
+          />
+        </span>
+        <span
+          className={`font-medium ${
+            hardwareOnline.connected ? "text-emerald-400" : "text-zinc-400"
+          }`}
+        >
+          ESP32 {hardwareOnline.connected ? "Online" : "Offline"} (
+          {hardwareOnline.esp32Online}/{hardwareOnline.esp32Total})
+        </span>
       </div>
     </div>
   );
