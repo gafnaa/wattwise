@@ -11,13 +11,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
+import { TextMorph } from "torph/react";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import {
   ChartContainer,
   ChartTooltip,
@@ -42,13 +37,10 @@ const isoChartConfig = {
 } satisfies ChartConfig;
 
 const paretoChartConfig = {
-  lossIdr: {
-    label: "Biaya Kerugian Idle",
-    color: "#f97316",
-  },
+  lossIdr: { label: "Kerugian Idle", color: "#f97316" },
 } satisfies ChartConfig;
 
-const PARETO_BAR_COLORS = [
+const PARETO_COLORS = [
   "#f43f5e",
   "#f97316",
   "#f59e0b",
@@ -76,27 +68,19 @@ export function EnergyChartsPanel({
   }, [machines, metrics.paretoScale]);
 
   return (
-    <Card className="flex h-full flex-col border-border/80 bg-card/90 shadow-lg shadow-black/25">
-      <CardHeader className="pb-3">
-        <CardTitle className="text-sm font-semibold text-white">
-          Rasio &amp; Pareto Energi Mesin
-        </CardTitle>
-        <CardDescription className="text-xs text-muted-foreground">
-          Proporsi status ISO 14955-5 dan peringkat mesin penyumbang biaya idle
-        </CardDescription>
-      </CardHeader>
-
-      <CardContent className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-12">
-        {/* Donut Chart: Proporsi Daya (Status ISO) */}
-        <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-background/50 p-3.5 sm:col-span-5">
-          <p className="text-xs font-medium text-zinc-300">
-            Proporsi Daya (Status ISO)
-          </p>
-
-          <div className="relative my-1 flex items-center justify-center">
+    <section className="grid grid-cols-1 gap-4 lg:grid-cols-12">
+      {/* Proporsi Daya (Donut) */}
+      <Card className="border-border/80 bg-card/90 lg:col-span-5">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-sm font-semibold text-white">
+            Proporsi Daya
+          </CardTitle>
+        </CardHeader>
+        <CardContent className="flex flex-col items-center gap-4 sm:flex-row sm:justify-around">
+          <div className="relative flex items-center justify-center">
             <ChartContainer
               config={isoChartConfig}
-              className="aspect-square h-[168px] w-[168px]"
+              className="aspect-square h-[190px] w-[190px]"
             >
               <PieChart>
                 <ChartTooltip
@@ -118,8 +102,8 @@ export function EnergyChartsPanel({
                   data={metrics.isoDistribution}
                   dataKey="pct"
                   nameKey="label"
-                  innerRadius={48}
-                  outerRadius={70}
+                  innerRadius={56}
+                  outerRadius={80}
                   paddingAngle={3}
                   strokeWidth={0}
                 >
@@ -130,65 +114,62 @@ export function EnergyChartsPanel({
               </PieChart>
             </ChartContainer>
 
-            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center text-center">
-              <span className="font-mono text-xl font-bold text-white">
-                {metrics.operationalEfficiencyPct}%
+            <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
+              <span className="font-mono text-2xl font-bold text-white">
+                <TextMorph>{`${metrics.operationalEfficiencyPct}%`}</TextMorph>
               </span>
-              <span className="text-[10px] text-zinc-400">Efisiensi</span>
+              <span className="text-[10px] text-zinc-500">ISO 14955-5</span>
             </div>
           </div>
 
-          <div className="space-y-1.5 pt-1">
+          <div className="w-full max-w-[180px] space-y-2.5">
             {metrics.isoDistribution.map((item) => (
               <div
                 key={item.key}
-                className="flex items-center justify-between text-[11px]"
+                className="flex items-center justify-between text-xs"
               >
-                <span className="flex items-center gap-1.5 text-zinc-300">
+                <span className="flex items-center gap-2 text-zinc-300">
                   <span
-                    className="inline-block size-2 rounded-full"
+                    className="size-2.5 rounded-full"
                     style={{ backgroundColor: item.color }}
                   />
                   {item.label}
                 </span>
-                <span className="font-mono text-zinc-400">
-                  {item.pct}% ({item.kwh} kWh)
-                </span>
+                <span className="font-mono text-zinc-400">{item.pct}%</span>
               </div>
             ))}
           </div>
-        </div>
+        </CardContent>
+      </Card>
 
-        {/* Horizontal Bar Chart: Mesin Paling Boros (Pareto) */}
-        <div className="flex flex-col justify-between rounded-xl border border-border/70 bg-background/50 p-3.5 sm:col-span-7">
-          <div className="mb-1 flex items-center justify-between gap-2">
-            <p className="text-xs font-medium text-zinc-300">
-              Mesin Paling Boros (Pareto)
-            </p>
-            <span className="text-[10px] text-zinc-500">
-              Biaya Kerugian Idle (Rp)
-            </span>
-          </div>
-
+      {/* Mesin Terboros (Pareto) */}
+      <Card className="border-border/80 bg-card/90 lg:col-span-7">
+        <CardHeader className="flex flex-row items-center justify-between pb-2">
+          <CardTitle className="text-sm font-semibold text-white">
+            Mesin Terboros (Pareto Idle)
+          </CardTitle>
+          <span className="font-mono text-[11px] text-zinc-500">Rupiah</span>
+        </CardHeader>
+        <CardContent>
           <ChartContainer
             config={paretoChartConfig}
-            className="h-[225px] w-full"
+            className="h-[220px] w-full"
           >
             <BarChart
               data={paretoData}
               layout="vertical"
-              margin={{ top: 4, right: 12, left: 0, bottom: 0 }}
+              margin={{ top: 4, right: 16, left: 0, bottom: 0 }}
             >
               <CartesianGrid
                 horizontal={false}
                 strokeDasharray="3 3"
-                stroke="rgba(148,163,184,0.12)"
+                stroke="rgba(148,163,184,0.1)"
               />
               <XAxis
                 type="number"
                 tickLine={false}
                 axisLine={false}
-                tick={{ fill: "#94a3b8", fontSize: 10 }}
+                tick={{ fill: "#94a3b8", fontSize: 11 }}
                 tickFormatter={(val: number) =>
                   val >= 1_000_000
                     ? `${(val / 1_000_000).toFixed(1)}jt`
@@ -198,7 +179,7 @@ export function EnergyChartsPanel({
               <YAxis
                 type="category"
                 dataKey="shortName"
-                width={94}
+                width={96}
                 tickLine={false}
                 axisLine={false}
                 tick={{ fill: "#cbd5e1", fontSize: 11 }}
@@ -210,7 +191,7 @@ export function EnergyChartsPanel({
                     hideLabel
                     formatter={(value, _name, item) => (
                       <div className="space-y-0.5">
-                        <p className="text-[11px] font-medium text-zinc-200">
+                        <p className="text-[11px] text-zinc-300">
                           {item?.payload?.fullName}
                         </p>
                         <p className="font-mono text-xs font-semibold text-amber-300">
@@ -221,18 +202,18 @@ export function EnergyChartsPanel({
                   />
                 }
               />
-              <Bar dataKey="lossIdr" radius={[0, 6, 6, 0]} barSize={16}>
+              <Bar dataKey="lossIdr" radius={[0, 6, 6, 0]} barSize={18}>
                 {paretoData.map((entry, idx) => (
                   <Cell
                     key={entry.shortName}
-                    fill={PARETO_BAR_COLORS[idx % PARETO_BAR_COLORS.length]}
+                    fill={PARETO_COLORS[idx % PARETO_COLORS.length]}
                   />
                 ))}
               </Bar>
             </BarChart>
           </ChartContainer>
-        </div>
-      </CardContent>
-    </Card>
+        </CardContent>
+      </Card>
+    </section>
   );
 }

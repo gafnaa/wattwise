@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Geist, Geist_Mono } from "next/font/google";
-import { TooltipProvider } from "@/components/ui/tooltip";
+import "skullet/styles.css";
+import { AppProviders } from "@/components/providers/app-providers";
 import "./globals.css";
 
 const geistSans = Geist({
@@ -14,9 +15,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WattWise — Smart Energy Audit System",
-  description:
-    "Sistem Audit Energi Pintar Berbasis IoT untuk Pemantauan Status Mesin dan Efisiensi Daya pada UMKM Mebel Skala Menengah",
+  title: "WattWise — Audit Energi Pintar",
+  description: "Pemantauan status mesin dan efisiensi daya UMKM mebel.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {
@@ -26,7 +26,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
     >
       <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-orange-500/30 selection:text-orange-100">
-        <TooltipProvider>{children}</TooltipProvider>
+        <AppProviders>{children}</AppProviders>
       </body>
     </html>
   );
