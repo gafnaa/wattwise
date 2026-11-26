@@ -184,7 +184,7 @@ Pengembangan dilakukan secara bertahap agar siap untuk demonstrasi **Hackathon D
 | :--- | :--- | :--- |
 | **Frontend & App Framework** | **Next.js (App Router), TypeScript, Tailwind CSS** | Web Dashboard (*Smart Audit*), Login, Simulator *What-If*, serta API Routes |
 | **Visualisasi Data** | Charting library berbasis React (mis. Recharts / Chart.js) & ikon (Lucide) | Donut Chart Status ISO, Pareto Bar Chart, tren daya mesin |
-| **Backend & Database** | Next.js API Routes / Node.js + PostgreSQL / SQLite (tahap MVP) | Ingest telemetri ESP32, kalkulasi Virtual Sensor, log tindakan, konfigurasi |
+| **Backend & Database** | Next.js API Routes / Node.js + **PostgreSQL (Supabase / Neon) + Prisma ORM** | Ingest telemetri ESP32, kalkulasi Virtual Sensor, log tindakan, konfigurasi |
 | **AI / Machine Learning** | Python (`scikit-learn` Random Forest) / inference service | Klasifikasi status mesin ISO 14955-5 & rekomendasi aksi berbasis aturan/AI |
 | **Notifikasi** | Telegram Bot API (`WattWise Bot`) | Laporan berkala & *urgent idle alerts* |
 | **Edge / Firmware** | ESP32 (Arduino / PlatformIO) + PZEM-004T | Akuisisi data listrik & pengiriman JSON via HTTP/MQTT |
@@ -196,7 +196,7 @@ Pengembangan dilakukan secara bertahap agar siap untuk demonstrasi **Hackathon D
 ### Tahap 1 — Fondasi & Arsitektur (Saat Ini)
 - [x] Inisialisasi boilerplate **Next.js + TypeScript + Tailwind CSS**
 - [x] Penyusunan **PRD v1.0** & repositori GitHub
-- [ ] Perancangan skema database, kontrak API telemetri ESP32, dan desain arsitektur detail
+- [x] Perancangan skema database, kontrak API telemetri ESP32, dan desain arsitektur detail ([ARCHITECTURE.md](./ARCHITECTURE.md))
 
 ### Tahap 2 — Purwarupa Software & ML (Menuju 29 Nov 2026)
 - [ ] Implementasi UI Login & Dashboard *Smart Audit* sesuai mockup Lampiran 5

@@ -4,6 +4,7 @@
 
 ## Dokumentasi
 - [Product Requirements Document (PRD.md)](./PRD.md)
+- [Technical Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)
 
 ## Tech Stack (Boilerplate)
 - **Framework:** Next.js 16 (App Router) + TypeScript
