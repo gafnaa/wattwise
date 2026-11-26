@@ -2,7 +2,38 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyEnergyPortfolioQuadrant } from "@/lib/audit/portfolio";
 import { getCurrentSession } from "@/lib/auth";
+import { getDashboardOverview } from "@/lib/dashboard/service";
 import { db } from "@/lib/db";
+
+export async function GET(request: Request) {
+  const { searchParams } = new URL(request.url);
+  const statusFilter = searchParams.get("status")?.toUpperCase();
+  const quadrantFilter = searchParams.get("quadrant")?.toUpperCase();
+  const query = searchParams.get("q")?.trim().toLowerCase();
+
+  const session = await getCurrentSession();
+  const overview = await getDashboardOverview("today", session?.workshopId);
+
+  const machines = overview.machines.filter((m) => {
+    const okStatus = !statusFilter || statusFilter === "ALL" || m.status === statusFilter;
+    const okQuadrant =
+      !quadrantFilter ||
+      quadrantFilter === "ALL" ||
+      m.portfolioQuadrant === quadrantFilter;
+    const okQuery =
+      !query ||
+      m.name.toLowerCase().includes(query) ||
+      m.code.toLowerCase().includes(query);
+    return okStatus && okQuadrant && okQuery;
+  });
+
+  return NextResponse.json({
+    dataSource: overview.dataSource,
+    count: machines.length,
+    virtualSensor: overview.virtualSensor,
+    machines,
+  });
+}
 
 const createMachineSchema = z.object({
   code: z.string().trim().min(2).max(32),
