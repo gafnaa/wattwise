@@ -199,7 +199,7 @@ Pengembangan dilakukan secara bertahap agar siap untuk demonstrasi **Hackathon D
 - [x] Perancangan skema database, kontrak API telemetri ESP32, dan desain arsitektur detail ([ARCHITECTURE.md](./ARCHITECTURE.md))
 
 ### Tahap 2 — Purwarupa Software & ML (Menuju 29 Nov 2026)
-- [ ] Implementasi UI Login & Dashboard *Smart Audit* sesuai mockup Lampiran 5
+- [x] Implementasi UI Login & Dashboard *Smart Audit* (shadcn/ui) sesuai mockup Lampiran 5
 - [ ] Implementasi simulator data sensor & kalkulasi Virtual Sensor + biaya (Rp)
 - [ ] Implementasi model klasifikasi **Random Forest** (`OFF`, `START-UP`, `IDLE`, `WORKING`)
 - [ ] Implementasi **Simulator "What-If"** & integrasi **Telegram Bot (`WattWise Bot`)**
