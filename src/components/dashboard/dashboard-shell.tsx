@@ -1,11 +1,12 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Activity,
   Bell,
   Calendar,
+  Database,
   Download,
   Filter,
   LogOut,
@@ -55,12 +56,14 @@ import {
   type ActionLogItem,
   type DateRangeKey,
   type MachineCardData,
+  type PeriodMetrics,
   type PortfolioQuadrant,
 } from "@/lib/mock-dashboard-data";
 
 type QuadrantFilter = "ALL" | PortfolioQuadrant;
 
 export function DashboardShell() {
+  const router = useRouter();
   const searchInputRef = React.useRef<HTMLInputElement>(null);
 
   const [dateRange, setDateRange] = React.useState<DateRangeKey>("month");
@@ -68,10 +71,41 @@ export function DashboardShell() {
   const [quadrantFilter, setQuadrantFilter] =
     React.useState<QuadrantFilter>("ALL");
   const [liveSimEnabled, setLiveSimEnabled] = React.useState(true);
+  const [dataSource, setDataSource] = React.useState<"database" | "demo">(
+    "demo"
+  );
+  const [metrics, setMetrics] = React.useState<PeriodMetrics>(
+    PERIOD_METRICS.month
+  );
   const [machines, setMachines] =
     React.useState<MachineCardData[]>(INITIAL_MACHINES);
   const [actionLogs, setActionLogs] =
     React.useState<ActionLogItem[]>(INITIAL_ACTION_LOGS);
+
+  // Ambil data dashboard dari API (/api/dashboard/overview) tiap ganti periode
+  React.useEffect(() => {
+    let active = true;
+    fetch(`/api/dashboard/overview?range=${dateRange}`)
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data) => {
+        if (!active || !data) return;
+        if (data.dataSource) setDataSource(data.dataSource);
+        if (data.metrics) setMetrics(data.metrics);
+        if (Array.isArray(data.machines) && data.machines.length > 0) {
+          setMachines(data.machines);
+        }
+        if (Array.isArray(data.actionLogs) && data.actionLogs.length > 0) {
+          setActionLogs(data.actionLogs);
+        }
+      })
+      .catch(() => {
+        if (active) setMetrics(PERIOD_METRICS[dateRange]);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [dateRange]);
 
   // Shortcut Ctrl+K / Cmd+K untuk fokus ke kolom pencarian
   React.useEffect(() => {
@@ -121,8 +155,6 @@ export function DashboardShell() {
     return () => window.clearInterval(timer);
   }, [liveSimEnabled]);
 
-  const metrics = PERIOD_METRICS[dateRange];
-
   const visibleMachines = React.useMemo(() => {
     if (quadrantFilter === "ALL") return machines;
     return machines.filter((m) => m.portfolioQuadrant === quadrantFilter);
@@ -138,50 +170,44 @@ export function DashboardShell() {
     [machines]
   );
 
-  function handleToggleActionStatus(id: string) {
+  async function handleToggleActionStatus(id: string) {
+    const target = actionLogs.find((item) => item.id === id);
+    if (!target) return;
+    const nextStatus =
+      target.status === "COMPLETED" ? "PENDING" : "COMPLETED";
+
     setActionLogs((prev) =>
       prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              status: item.status === "COMPLETED" ? "PENDING" : "COMPLETED",
-            }
-          : item
+        item.id === id ? { ...item, status: nextStatus } : item
       )
     );
+
+    try {
+      await fetch(`/api/recommendations/${encodeURIComponent(id)}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ status: nextStatus }),
+      });
+    } catch {
+      // Optimistic update tetap dipertahankan di UI
+    }
+  }
+
+  async function handleLogout() {
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+    } finally {
+      router.push("/login");
+    }
   }
 
   function handleExportCsv() {
-    const header = [
-      "Kode Mesin",
-      "Nama Mesin",
-      "Status ISO 14955-5",
-      "Daya Aktual (W)",
-      "Daya Rated (W)",
-      "Power Factor",
-      "Kuadran Portfolio",
-      "Estimasi Rugi Idle/Bulan (Rp)",
-    ];
-    const rows = visibleMachines.map((m) => [
-      m.code,
-      `"${m.name}"`,
-      m.status,
-      m.currentPowerW,
-      m.ratedPowerW,
-      m.powerFactor,
-      m.portfolioQuadrant,
-      m.idleLossMonthIdr,
-    ]);
-    const csvContent = [header.join(","), ...rows.map((r) => r.join(","))].join(
-      "\n"
-    );
-    const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" });
-    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
-    link.href = url;
+    link.href = `/api/export/audit?range=${dateRange}`;
     link.download = `wattwise-audit-${dateRange}.csv`;
+    document.body.appendChild(link);
     link.click();
-    URL.revokeObjectURL(url);
+    link.remove();
   }
 
   return (
@@ -362,7 +388,7 @@ export function DashboardShell() {
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     variant="destructive"
-                    render={<Link href="/login" />}
+                    onClick={handleLogout}
                     className="text-xs"
                   >
                     <LogOut className="mr-2 size-3.5" />
@@ -393,6 +419,17 @@ export function DashboardShell() {
             <span className="hidden text-xs text-muted-foreground sm:inline">
               • {WORKSHOP_INFO.location}
             </span>
+            <Badge
+              variant="outline"
+              className={
+                dataSource === "database"
+                  ? "border-emerald-500/35 bg-emerald-500/10 text-[10px] text-emerald-300"
+                  : "border-sky-500/35 bg-sky-500/10 text-[10px] text-sky-300"
+              }
+            >
+              <Database className="mr-1 size-3" />
+              {dataSource === "database" ? "PostgreSQL Live" : "Mode Demo"}
+            </Badge>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
