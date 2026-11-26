@@ -19,7 +19,9 @@ export const metadata: Metadata = {
   description: "Pemantauan status mesin dan efisiensi daya UMKM mebel.",
 };
 
-export default function RootLayout({ children }: LayoutProps<"/">) {
+export default function RootLayout({
+  children,
+}: Readonly<{ children: React.ReactNode }>) {
   return (
     <html
       lang="id"
