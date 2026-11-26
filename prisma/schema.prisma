@@ -1,0 +1,252 @@
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+// =============================================================================
+// Enums
+// =============================================================================
+
+enum UserRole {
+  OWNER
+  TECHNICIAN
+  ADMIN
+}
+
+enum PortfolioQuadrant {
+  CRITICAL        // Kuadran II: Daya tinggi, jam operasi tinggi (wajib sensor)
+  LEVERAGE_POWER  // Kuadran I: Daya tinggi, jam operasi rendah
+  LEVERAGE_TIME   // Kuadran III: Daya rendah, jam operasi tinggi
+  NONCRITICAL     // Kuadran IV: Daya rendah, jam operasi rendah (Virtual Sensor)
+}
+
+enum MachineType {
+  CNC
+  EDGE_BANDER
+  PANEL_SAW
+  DUST_COLLECTOR
+  BORING
+  COMPRESSOR
+  VIRTUAL_AGGREGATE
+  OTHER
+}
+
+// Status operasional mesin sesuai standar ISO 14955-5:2020
+enum MachineStatus {
+  OFF
+  START_UP
+  IDLE
+  WORKING
+}
+
+enum RecommendationStatus {
+  PENDING
+  COMPLETED
+  DISMISSED
+}
+
+enum RecommendationSource {
+  AI_RULE
+  AI_LLM
+  MANUAL
+}
+
+enum NotificationType {
+  URGENT_IDLE
+  DAILY_SUMMARY
+  WHAT_IF_REPORT
+}
+
+enum DeliveryStatus {
+  SENT
+  FAILED
+}
+
+// =============================================================================
+// Models
+// =============================================================================
+
+model Workshop {
+  id                  String   @id @default(uuid())
+  code                String   @unique
+  name                String
+  location            String
+  tariffIdrPerKwh     Decimal  @default(1444.70) @map("tariff_idr_per_kwh") @db.Decimal(10, 2)
+  workingDaysPerMonth Int      @default(26) @map("working_days_per_month")
+  telegramChatId      String?  @map("telegram_chat_id")
+  createdAt           DateTime @default(now()) @map("created_at")
+  updatedAt           DateTime @updatedAt @map("updated_at")
+
+  users                 User[]
+  machines              Machine[]
+  devices               Device[]
+  productionLogs        ProductionLog[]
+  actionRecommendations ActionRecommendation[]
+  telegramNotifications TelegramNotification[]
+
+  @@map("workshops")
+}
+
+model User {
+  id           String   @id @default(uuid())
+  workshopId   String   @map("workshop_id")
+  username     String   @unique
+  passwordHash String   @map("password_hash")
+  fullName     String   @map("full_name")
+  role         UserRole @default(OWNER)
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @updatedAt @map("updated_at")
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId])
+  @@map("users")
+}
+
+model Machine {
+  id                    String            @id @default(uuid())
+  workshopId            String            @map("workshop_id")
+  code                  String
+  name                  String
+  machineType           MachineType       @map("machine_type")
+  ratedPowerW           Float             @map("rated_power_w")
+  annualOperatingHours  Float             @map("annual_operating_hours")
+  portfolioQuadrant     PortfolioQuadrant @map("portfolio_quadrant")
+  hasPhysicalSensor     Boolean           @default(true) @map("has_physical_sensor")
+  idleAlertThresholdMin Int               @default(20) @map("idle_alert_threshold_min")
+  baselineIdleW         Float             @map("baseline_idle_w")
+  baselineWorkingW      Float             @map("baseline_working_w")
+  isActive              Boolean           @default(true) @map("is_active")
+  createdAt             DateTime          @default(now()) @map("created_at")
+  updatedAt             DateTime          @updatedAt @map("updated_at")
+
+  workshop              Workshop               @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  device                Device?
+  telemetryReadings     TelemetryReading[]
+  stateSessions         MachineStateSession[]
+  actionRecommendations ActionRecommendation[]
+  telegramNotifications TelegramNotification[]
+
+  @@unique([workshopId, code])
+  @@index([workshopId, isActive])
+  @@map("machines")
+}
+
+model Device {
+  id              String    @id @default(uuid())
+  workshopId      String    @map("workshop_id")
+  machineId       String?   @unique @map("machine_id")
+  deviceUid       String    @unique @map("device_uid")
+  apiKeyHash      String    @map("api_key_hash")
+  isMainMeter     Boolean   @default(false) @map("is_main_meter")
+  firmwareVersion String    @default("1.0.0") @map("firmware_version")
+  lastSeenAt      DateTime? @map("last_seen_at")
+  createdAt       DateTime  @default(now()) @map("created_at")
+  updatedAt       DateTime  @updatedAt @map("updated_at")
+
+  workshop          Workshop           @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  machine           Machine?           @relation(fields: [machineId], references: [id], onDelete: SetNull)
+  telemetryReadings TelemetryReading[]
+
+  @@index([workshopId, isMainMeter])
+  @@map("devices")
+}
+
+model TelemetryReading {
+  id               BigInt        @id @default(autoincrement())
+  deviceId         String?       @map("device_id")
+  machineId        String        @map("machine_id")
+  sampleIndex      Int?          @map("sample_index") // Kompatibel dengan kolom `index` dataset hardware
+  recordedAt       DateTime      @map("recorded_at")
+  powerW           Float         @map("power_w") // Atribut wajib (Watt)
+  voltageV         Float?        @map("voltage_v") // Opsional dari PZEM-004T
+  currentA         Float?        @map("current_a") // Opsional dari PZEM-004T
+  energyKwh        Float?        @map("energy_kwh") // Opsional (atau hasil integrasi daya x dt)
+  frequencyHz      Float?        @map("frequency_hz") // Opsional dari PZEM-004T
+  powerFactor      Float?        @map("power_factor") // Opsional dari PZEM-004T
+  predictedStatus  MachineStatus @default(OFF) @map("predicted_status")
+  statusConfidence Float?        @map("status_confidence")
+  isSimulated      Boolean       @default(false) @map("is_simulated")
+  createdAt        DateTime      @default(now()) @map("created_at")
+
+  device  Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([machineId, recordedAt(sort: Desc)])
+  @@index([deviceId, recordedAt(sort: Desc)])
+  @@index([recordedAt(sort: Desc)])
+  @@map("telemetry_readings")
+}
+
+model MachineStateSession {
+  id          String        @id @default(uuid())
+  machineId   String        @map("machine_id")
+  status      MachineStatus
+  startedAt   DateTime      @map("started_at")
+  endedAt     DateTime?     @map("ended_at")
+  durationSec Int           @map("duration_sec")
+  avgPowerW   Float         @map("avg_power_w")
+  energyKwh   Float         @map("energy_kwh")
+  costIdr     Decimal       @map("cost_idr") @db.Decimal(12, 2)
+  createdAt   DateTime      @default(now()) @map("created_at")
+
+  machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([machineId, startedAt(sort: Desc)])
+  @@index([status, startedAt(sort: Desc)])
+  @@map("machine_state_sessions")
+}
+
+model ProductionLog {
+  id              String   @id @default(uuid())
+  workshopId      String   @map("workshop_id")
+  productCategory String   @map("product_category")
+  outputUnits     Int      @map("output_units")
+  periodDate      DateTime @map("period_date") @db.Date
+  notes           String?
+  createdAt       DateTime @default(now()) @map("created_at")
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId, periodDate(sort: Desc)])
+  @@map("production_logs")
+}
+
+model ActionRecommendation {
+  id                 String               @id @default(uuid())
+  workshopId         String               @map("workshop_id")
+  machineId          String               @map("machine_id")
+  recommendationText String               @map("recommendation_text")
+  status             RecommendationStatus @default(PENDING)
+  source             RecommendationSource @default(AI_RULE)
+  estimatedSavingIdr Decimal              @map("estimated_saving_idr") @db.Decimal(12, 2)
+  createdAt          DateTime             @default(now()) @map("created_at")
+  completedAt        DateTime?            @map("completed_at")
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  machine  Machine  @relation(fields: [machineId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId, status, createdAt(sort: Desc)])
+  @@map("action_recommendations")
+}
+
+model TelegramNotification {
+  id               String           @id @default(uuid())
+  workshopId       String           @map("workshop_id")
+  machineId        String?          @map("machine_id")
+  notificationType NotificationType @map("notification_type")
+  messageBody      String           @map("message_body")
+  deliveryStatus   DeliveryStatus   @default(SENT) @map("delivery_status")
+  sentAt           DateTime         @default(now()) @map("sent_at")
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+  machine  Machine? @relation(fields: [machineId], references: [id], onDelete: SetNull)
+
+  @@index([workshopId, sentAt(sort: Desc)])
+  @@index([machineId, notificationType, sentAt(sort: Desc)])
+  @@map("telegram_notifications")
+}
