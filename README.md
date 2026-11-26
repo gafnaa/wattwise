@@ -6,6 +6,7 @@
 - [Product Requirements Document (PRD.md)](./PRD.md)
 - [Technical Architecture (ARCHITECTURE.md)](./ARCHITECTURE.md)
 - [ML Pipeline & Google Colab Guide (ml/README.md)](./ml/README.md)
+- [ESP32 + PZEM-004T Firmware Guide (firmware/esp32_pzem_wattwise/README.md)](./firmware/esp32_pzem_wattwise/README.md)
 
 ## Tech Stack
 - **Framework:** Next.js 16 (App Router) + TypeScript
@@ -38,6 +39,7 @@ Buka [http://localhost:3000](http://localhost:3000) di browser.
 - `npm run lint` — Menjalankan ESLint
 - `npm test` — Menjalankan unit test ML Random Forest & Audit Engine
 - `npm run ml:train` — Regenerasi model baseline `src/lib/ml/rf-model.json`
+- `npm run iot:simulate` — Simulasi pengiriman telemetri ESP32 ke backend API
 - `npm run db:generate` — Generate Prisma Client
 - `npm run db:push` — Push skema Prisma ke PostgreSQL
 - `npm run db:migrate` — Jalankan migrasi Prisma
