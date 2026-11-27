@@ -1,207 +1,296 @@
 "use client";
 
 import * as React from "react";
-import Link from "next/link";
 import {
-  ArrowRight,
-  Calendar,
-  Cpu,
+  Clock,
   Download,
-  Sparkles,
+  PauseCircle,
+  PlayCircle,
+  Wallet,
+  Zap,
 } from "lucide-react";
 import { Skeleton } from "skullet/react";
-import { TextMorph } from "torph/react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { AiInsightCard } from "@/components/dashboard/ai-insight-card";
+import { EnergyConsumptionCard } from "@/components/dashboard/energy-consumption-card";
+import { EnergyPerMachineCard } from "@/components/dashboard/energy-per-machine-card";
+import { MachineStatusDonutCard } from "@/components/dashboard/machine-status-donut-card";
 import { AppShell } from "@/components/layout/app-shell";
-import { EnergyChartsPanel } from "@/components/dashboard/energy-charts-panel";
-import { KpiCards } from "@/components/dashboard/kpi-cards";
+import { Button } from "@/components/ui/button";
+import {
+  DataSourceBadge,
+  KpiMetricCard,
+} from "@/components/ui/wattwise-badges";
+import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
   formatRupiah,
   INITIAL_ACTION_LOGS,
   INITIAL_MACHINES,
   PERIOD_METRICS,
-  type ActionLogItem,
+  VIRTUAL_SENSOR_SUMMARY,
+  WORKSHOP_INFO,
   type DateRangeKey,
-  type MachineCardData,
-  type PeriodMetrics,
 } from "@/lib/mock-dashboard-data";
 
+function buildDefaultOverview(range: DateRangeKey): DashboardOverviewResponse {
+  return {
+    dataSource: "demo",
+    workshop: {
+      id: "demo-ws-skh-01",
+      code: WORKSHOP_INFO.code,
+      name: WORKSHOP_INFO.name,
+      location: WORKSHOP_INFO.location,
+      tariffIdrPerKwh: WORKSHOP_INFO.tariffIdrPerKwh,
+      workingDaysPerMonth: WORKSHOP_INFO.workingDaysPerMonth,
+      esp32OnlineCount: WORKSHOP_INFO.esp32OnlineCount,
+      esp32TotalCount: WORKSHOP_INFO.esp32TotalCount,
+    },
+    metrics: PERIOD_METRICS[range],
+    machines: INITIAL_MACHINES,
+    virtualSensor: VIRTUAL_SENSOR_SUMMARY,
+    actionLogs: INITIAL_ACTION_LOGS,
+  };
+}
+
+function getGreetingFromDate(date: Date): string {
+  const hour = date.getHours();
+  if (hour < 11) return "Selamat pagi";
+  if (hour < 15) return "Selamat siang";
+  if (hour < 18) return "Selamat sore";
+  return "Selamat malam";
+}
+
 export function DashboardShell() {
-  const [dateRange, setDateRange] = React.useState<DateRangeKey>("month");
+  const [range, setRange] = React.useState<DateRangeKey>("month");
+  const [overview, setOverview] = React.useState<DashboardOverviewResponse>(() =>
+    buildDefaultOverview("month")
+  );
   const [loading, setLoading] = React.useState(true);
-  const [dataSource, setDataSource] = React.useState<"database" | "demo">(
-    "demo"
-  );
-  const [metrics, setMetrics] = React.useState<PeriodMetrics>(
-    PERIOD_METRICS.month
-  );
-  const [machines, setMachines] =
-    React.useState<MachineCardData[]>(INITIAL_MACHINES);
-  const [actionLogs, setActionLogs] =
-    React.useState<ActionLogItem[]>(INITIAL_ACTION_LOGS);
+  const [greeting, setGreeting] = React.useState("Selamat datang");
+  const [lastUpdatedLabel, setLastUpdatedLabel] = React.useState("Baru saja");
 
   React.useEffect(() => {
-    let active = true;
+    let cancelled = false;
 
-    fetch(`/api/dashboard/overview?range=${dateRange}`)
+    fetch(`/api/dashboard/overview?range=${range}`, { cache: "no-store" })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (!active) return;
-        if (data?.dataSource) setDataSource(data.dataSource);
-        if (data?.metrics) setMetrics(data.metrics);
-        if (Array.isArray(data?.machines) && data.machines.length > 0) {
-          setMachines(data.machines);
-        }
-        if (Array.isArray(data?.actionLogs) && data.actionLogs.length > 0) {
-          setActionLogs(data.actionLogs);
+      .then((data: DashboardOverviewResponse | null) => {
+        if (!cancelled) {
+          const now = new Date();
+          setGreeting(getGreetingFromDate(now));
+          if (data?.metrics) {
+            setOverview(data);
+            setLastUpdatedLabel(
+              now.toLocaleTimeString("id-ID", {
+                hour: "2-digit",
+                minute: "2-digit",
+              }) + " WIB"
+            );
+          }
         }
       })
-      .catch(() => {
-        if (active) setMetrics(PERIOD_METRICS[dateRange]);
-      })
+      .catch(() => null)
       .finally(() => {
-        if (active) setLoading(false);
+        if (!cancelled) setLoading(false);
       });
 
     return () => {
-      active = false;
+      cancelled = true;
     };
-  }, [dateRange]);
+  }, [range]);
 
-  const idleCount = machines.filter((m) => m.status === "IDLE").length;
-  const workingCount = machines.filter((m) => m.status === "WORKING").length;
-  const pendingActions = actionLogs.filter((a) => a.status === "PENDING");
-  const pendingSavings = pendingActions.reduce(
-    (sum, a) => sum + a.estimatedSavingIdr,
-    0
-  );
+  function handleRangeChange(next: DateRangeKey) {
+    setLoading(true);
+    setRange(next);
+  }
 
   function handleExportCsv() {
-    const link = document.createElement("a");
-    link.href = `/api/export/audit?range=${dateRange}`;
-    link.download = `wattwise-audit-${dateRange}.csv`;
-    document.body.appendChild(link);
-    link.click();
-    link.remove();
+    const a = document.createElement("a");
+    a.href = `/api/export/audit?range=${range}`;
+    a.download = `wattwise-audit-${range}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
+
+  const idleKwh = Number(
+    (
+      overview.metrics.idleLossIdr /
+      Math.max(1, overview.workshop.tariffIdrPerKwh)
+    ).toFixed(1)
+  );
+  const idleSharePct =
+    overview.metrics.totalEnergyKwh > 0
+      ? Number(((idleKwh / overview.metrics.totalEnergyKwh) * 100).toFixed(1))
+      : 0;
+  const workingMachines = overview.machines.filter(
+    (m) => m.status === "WORKING"
+  );
+  const startupMachines = overview.machines.filter(
+    (m) => m.status === "START_UP"
+  );
+  const activeMachinesCount = workingMachines.length + startupMachines.length;
+  const idleMachines = overview.machines.filter((m) => m.status === "IDLE");
+  const pendingRecsCount = overview.actionLogs.filter(
+    (a) => a.status === "PENDING"
+  ).length;
 
   return (
     <AppShell
       title="Ringkasan"
-      dataSource={dataSource}
-      actions={
-        <>
-          <Select
-            value={dateRange}
-            onValueChange={(val) => {
-              if (val && val !== dateRange) {
-                setLoading(true);
-                setDateRange(val as DateRangeKey);
-              }
-            }}
-          >
-            <SelectTrigger className="h-8 border-border/80 bg-background/70 text-xs text-zinc-200">
-              <Calendar className="mr-1.5 size-3.5 text-zinc-400" />
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="month">30 Hari</SelectItem>
-              <SelectItem value="week">7 Hari</SelectItem>
-              <SelectItem value="today">Hari Ini</SelectItem>
-            </SelectContent>
-          </Select>
-
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={handleExportCsv}
-            className="h-8 border-border/80 bg-background/70 text-xs text-zinc-200"
-          >
-            <Download className="mr-1.5 size-3.5 text-orange-400" />
-            <span className="hidden sm:inline">Ekspor</span>
-          </Button>
-        </>
-      }
+      section="Menu Utama"
+      dataSource={overview.dataSource}
+      workshopName={overview.workshop.name}
+      onlineDevices={overview.workshop.esp32OnlineCount}
+      totalDevices={overview.workshop.esp32TotalCount}
+      pendingRecommendationsCount={pendingRecsCount}
+      range={range}
+      onRangeChange={handleRangeChange}
     >
-      <div className="space-y-5">
-        {/* KPI Summary dengan Skullet smart skeleton */}
-        <Skeleton loading={loading} id="overview-kpis" label="Memuat KPI">
-          <KpiCards metrics={metrics} />
+      <div className="space-y-6">
+        {/* Greeting + Legend + Export Row */}
+        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
+          <div>
+            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+              {greeting}, Pemilik Pabrik
+            </h2>
+            <p className="mt-1 text-xs text-muted-foreground">
+              Pemantauan {overview.machines.length} mesin prioritas di{" "}
+              {overview.workshop.name} · Data terakhir diterima{" "}
+              {lastUpdatedLabel}
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2">
+            <span className="hidden text-xs text-muted-foreground xl:inline">
+              Sumber data:
+            </span>
+            <DataSourceBadge kind="sensor" />
+            <DataSourceBadge kind="kalkulasi" />
+            <DataSourceBadge kind="prediksi-ml" />
+            <DataSourceBadge kind="rekomendasi-ai" />
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={handleExportCsv}
+              className="ml-1 h-8 gap-1.5 rounded-lg border-border bg-card text-xs font-medium"
+            >
+              <Download className="size-3.5" />
+              <span>Export</span>
+            </Button>
+          </div>
+        </div>
+
+        {/* 6 KPI Cards (3x2 Grid — Exact Figma 01 · Ringkasan) */}
+        <Skeleton loading={loading}>
+          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            <KpiMetricCard
+              icon={<Zap className="size-4" />}
+              iconTone="emerald"
+              title="Total Konsumsi Energi"
+              source="sensor"
+              value={overview.metrics.totalEnergyKwh.toLocaleString("id-ID", {
+                maximumFractionDigits: 1,
+              })}
+              unit="kWh"
+              trendLabel={`${overview.metrics.idleLossDeltaPct}%`}
+              trendDirection={
+                overview.metrics.idleLossDeltaPct <= 0 ? "down" : "up"
+              }
+              trendTone={
+                overview.metrics.idleLossDeltaPct <= 0 ? "positive" : "warning"
+              }
+              subtitle={`vs periode sebelumnya`}
+            />
+
+            <KpiMetricCard
+              icon={<Wallet className="size-4" />}
+              iconTone="zinc"
+              title="Estimasi Biaya Listrik"
+              source="kalkulasi"
+              value={formatRupiah(overview.metrics.totalEnergyCostIdr)}
+              trendLabel={`Efisiensi ${overview.metrics.operationalEfficiencyPct}%`}
+              trendDirection="down"
+              trendTone="positive"
+              subtitle={`tarif Rp ${overview.workshop.tariffIdrPerKwh.toLocaleString("id-ID")}/kWh`}
+            />
+
+            <KpiMetricCard
+              icon={<PauseCircle className="size-4" />}
+              iconTone="amber"
+              title="Energi Saat Idle"
+              source="prediksi-ml"
+              value={idleKwh.toLocaleString("id-ID")}
+              unit="kWh"
+              trendLabel={`${idleSharePct}%`}
+              trendDirection="up"
+              trendTone="warning"
+              subtitle="dari total konsumsi"
+            />
+
+            <KpiMetricCard
+              icon={<Clock className="size-4" />}
+              iconTone="amber"
+              title="Estimasi Biaya Idle"
+              source="kalkulasi"
+              value={formatRupiah(overview.metrics.idleLossIdr)}
+              trendLabel={overview.metrics.efficiencyBadge}
+              trendDirection="up"
+              trendTone="warning"
+              subtitle={`tertinggi: ${overview.metrics.topWasteMachine}`}
+            />
+
+            <KpiMetricCard
+              icon={<PlayCircle className="size-4" />}
+              iconTone="emerald"
+              title="Mesin Aktif"
+              source="prediksi-ml"
+              value={activeMachinesCount}
+              unit={`/ ${overview.machines.length} mesin`}
+              subtitle={`${workingMachines.length} Working · ${startupMachines.length} Start-up`}
+            />
+
+            <KpiMetricCard
+              icon={<PauseCircle className="size-4" />}
+              iconTone="amber"
+              title="Mesin dalam Kondisi Idle"
+              source="prediksi-ml"
+              value={idleMachines.length}
+              unit="mesin"
+              subtitle={
+                idleMachines.length > 0
+                  ? idleMachines.map((m) => m.name).join(", ")
+                  : "Semua mesin bekerja optimal atau mati"
+              }
+            />
+          </section>
         </Skeleton>
 
-        {/* Charts */}
-        <Skeleton loading={loading} id="overview-charts" label="Memuat grafik">
-          <EnergyChartsPanel metrics={metrics} machines={machines} />
-        </Skeleton>
+        {/* Row 2: Energy Consumption Chart (2fr) + Status Donut (1fr) */}
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="xl:col-span-8">
+            <EnergyConsumptionCard
+              machines={overview.machines}
+              totalEnergyKwh={overview.metrics.totalEnergyKwh}
+              tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
+            />
+          </div>
+          <div className="xl:col-span-4">
+            <MachineStatusDonutCard
+              machines={overview.machines}
+              metrics={overview.metrics}
+            />
+          </div>
+        </section>
 
-        {/* Business Flow Shortcuts -> /machines & /actions */}
-        <section className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <Card className="border-border/80 bg-card/90 transition-colors hover:border-amber-500/40">
-            <CardContent className="flex items-center justify-between gap-4 p-5">
-              <div className="flex items-center gap-3.5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-amber-500/30 bg-amber-500/10 text-amber-400">
-                  <Cpu className="size-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    <TextMorph>
-                      {`${idleCount} mesin idle • ${workingCount} aktif`}
-                    </TextMorph>
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Pantau status mesin &amp; Virtual CT live
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href="/machines" />}
-                className="shrink-0 border-border/80 text-xs"
-              >
-                Mesin
-                <ArrowRight className="ml-1.5 size-3.5" />
-              </Button>
-            </CardContent>
-          </Card>
-
-          <Card className="border-border/80 bg-card/90 transition-colors hover:border-emerald-500/40">
-            <CardContent className="flex items-center justify-between gap-4 p-5">
-              <div className="flex items-center gap-3.5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl border border-emerald-500/30 bg-emerald-500/10 text-emerald-400">
-                  <Sparkles className="size-5" />
-                </div>
-                <div>
-                  <p className="text-sm font-semibold text-white">
-                    <TextMorph>
-                      {`${pendingActions.length} aksi menunggu • ${formatRupiah(pendingSavings)}`}
-                    </TextMorph>
-                  </p>
-                  <p className="text-xs text-zinc-500">
-                    Simulasi What-If &amp; kirim laporan Telegram
-                  </p>
-                </div>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                render={<Link href="/actions" />}
-                className="shrink-0 border-border/80 text-xs"
-              >
-                Hemat &amp; Aksi
-                <ArrowRight className="ml-1.5 size-3.5" />
-              </Button>
-            </CardContent>
-          </Card>
+        {/* Row 3: Energy Per Machine (1fr) + AI Insight Card (1fr) */}
+        <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+          <EnergyPerMachineCard
+            machines={overview.machines}
+            tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
+            periodLabel={overview.metrics.label}
+          />
+          <AiInsightCard actionLogs={overview.actionLogs} />
         </section>
       </div>
     </AppShell>

@@ -2,8 +2,15 @@
 
 import * as React from "react";
 import { useRouter } from "next/navigation";
-import { Eye, EyeOff, Lock, User, Zap } from "lucide-react";
-import { TextMorph } from "torph/react";
+import {
+  ArrowRight,
+  Eye,
+  EyeOff,
+  KeyRound,
+  Loader2,
+  Lock,
+  Mail,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Input } from "@/components/ui/input";
@@ -15,168 +22,189 @@ export function LoginForm() {
   const [password, setPassword] = React.useState("wattwise123");
   const [rememberMe, setRememberMe] = React.useState(true);
   const [showPassword, setShowPassword] = React.useState(false);
+  const [loading, setLoading] = React.useState(false);
   const [error, setError] = React.useState<string | null>(null);
-  const [isSubmitting, setIsSubmitting] = React.useState(false);
-  const [hardwareOnline, setHardwareOnline] = React.useState({
-    connected: true,
-    esp32Online: 7,
-    esp32Total: 7,
-  });
 
-  React.useEffect(() => {
-    let active = true;
-    fetch("/api/auth/me")
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data) => {
-        if (active && data?.hardwareStatus) {
-          setHardwareOnline(data.hardwareStatus);
-        }
-      })
-      .catch(() => {});
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
+  async function submitCredentials(userVal: string, passVal: string) {
     setError(null);
-
-    if (!username.trim() || !password.trim()) {
-      setError("Isi username dan password.");
-      return;
-    }
-
-    setIsSubmitting(true);
+    setLoading(true);
     try {
+      const normalizedUser = userVal.includes("@")
+        ? userVal.split("@")[0].toLowerCase()
+        : userVal.trim();
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
-          username: username.trim(),
-          password,
-          rememberMe,
+          username: normalizedUser,
+          password: passVal,
         }),
       });
-      const data = (await res.json().catch(() => ({}))) as {
-        ok?: boolean;
-        error?: string;
-      };
-
-      if (!res.ok || !data.ok) {
-        setError(data.error ?? "Username atau password salah.");
-        setIsSubmitting(false);
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error ?? "Login gagal. Periksa akun Anda.");
         return;
       }
-
       router.push("/dashboard");
+      router.refresh();
     } catch {
-      setError("Koneksi gagal. Coba lagi.");
-      setIsSubmitting(false);
+      setError("Tidak dapat terhubung ke server WattWise.");
+    } finally {
+      setLoading(false);
     }
   }
 
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    await submitCredentials(username, password);
+  }
+
   return (
-    <div className="flex h-full flex-col justify-between p-7 sm:p-10">
-      <div className="mx-auto flex w-full max-w-xs flex-1 flex-col justify-center">
-        <div className="mb-8 flex flex-col items-center text-center">
-          <div className="mb-3 flex size-12 items-center justify-center rounded-2xl bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-lg shadow-orange-600/25">
-            <Zap className="size-6 fill-white" />
+    <div className="space-y-6">
+      <div className="space-y-1.5">
+        <h2 className="text-[26px] font-semibold tracking-tight text-foreground">
+          Masuk ke WattWise
+        </h2>
+        <p className="text-[13.5px] text-muted-foreground">
+          Gunakan akun kerja Anda untuk melanjutkan ke dasbor.
+        </p>
+      </div>
+
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="username"
+            className="text-xs font-medium text-foreground"
+          >
+            Email atau Username
+          </Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="username"
+              type="text"
+              value={username}
+              onChange={(e) => setUsername(e.target.value)}
+              placeholder="owner atau nama@perusahaan.co.id"
+              autoComplete="username"
+              required
+              className="h-10 rounded-lg border-border bg-card pl-9 text-[13.5px]"
+            />
           </div>
-          <h1 className="text-xl font-bold tracking-tight text-white">Masuk</h1>
-          <p className="mt-1 text-xs text-zinc-500">Akun demo: owner / wattwise123</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-1.5">
-            <Label htmlFor="username" className="text-xs text-zinc-400">
-              Username
-            </Label>
-            <div className="relative">
-              <User className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-500" />
-              <Input
-                id="username"
-                type="text"
-                autoComplete="username"
-                value={username}
-                onChange={(e) => setUsername(e.target.value)}
-                className="h-10 bg-background/70 pl-9 text-sm text-white"
-              />
-            </div>
+        <div className="space-y-1.5">
+          <Label
+            htmlFor="password"
+            className="text-xs font-medium text-foreground"
+          >
+            Kata sandi
+          </Label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Masukkan kata sandi"
+              autoComplete="current-password"
+              required
+              className="h-10 rounded-lg border-border bg-card pr-10 pl-9 text-[13.5px]"
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((prev) => !prev)}
+              className="absolute top-1/2 right-3 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+              aria-label="Tampilkan atau sembunyikan kata sandi"
+            >
+              {showPassword ? (
+                <EyeOff className="size-4" />
+              ) : (
+                <Eye className="size-4" />
+              )}
+            </button>
           </div>
+        </div>
 
-          <div className="space-y-1.5">
-            <Label htmlFor="password" className="text-xs text-zinc-400">
-              Password
-            </Label>
-            <div className="relative">
-              <Lock className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-zinc-500" />
-              <Input
-                id="password"
-                type={showPassword ? "text" : "password"}
-                autoComplete="current-password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="h-10 bg-background/70 pr-9 pl-9 text-sm text-white"
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((prev) => !prev)}
-                className="absolute top-1/2 right-3 -translate-y-1/2 text-zinc-500 hover:text-zinc-200"
-                aria-label="Toggle password"
-              >
-                {showPassword ? (
-                  <EyeOff className="size-4" />
-                ) : (
-                  <Eye className="size-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <label className="flex cursor-pointer items-center gap-2 text-xs text-zinc-400 select-none">
+        <div className="flex items-center justify-between pt-0.5 text-xs">
+          <label className="flex cursor-pointer items-center gap-2 text-muted-foreground">
             <Checkbox
               checked={rememberMe}
               onCheckedChange={(checked) => setRememberMe(Boolean(checked))}
-              className="border-zinc-700 data-checked:border-orange-500 data-checked:bg-orange-600"
+              className="border-zinc-300 data-checked:border-[#059669] data-checked:bg-[#059669]"
             />
             <span>Ingat saya</span>
           </label>
-
-          {error && (
-            <p className="rounded-lg border border-rose-500/35 bg-rose-500/10 px-3 py-2 text-xs text-rose-300">
-              {error}
-            </p>
-          )}
-
-          <Button
-            type="submit"
-            disabled={isSubmitting}
-            className="h-10 w-full bg-orange-600 text-sm font-semibold text-white hover:bg-orange-500"
+          <button
+            type="button"
+            onClick={() => {
+              setUsername("owner");
+              setPassword("wattwise123");
+            }}
+            className="font-medium text-[#047857] hover:underline dark:text-emerald-400"
           >
-            <TextMorph>{isSubmitting ? "Memproses..." : "Masuk"}</TextMorph>
-          </Button>
-        </form>
-      </div>
+            Isi akun demo
+          </button>
+        </div>
 
-      {/* Compact live status */}
-      <div className="mt-6 flex items-center justify-end gap-2 text-[11px] text-zinc-500">
-        <span className="relative flex size-2">
-          {hardwareOnline.connected && (
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+        {error && (
+          <div className="rounded-lg border border-red-200 bg-[#FEF2F2] px-3 py-2 text-xs text-[#DC2626] dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+            {error}
+          </div>
+        )}
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-10 w-full rounded-lg bg-[#059669] text-[13.5px] font-medium text-white hover:bg-[#047857]"
+        >
+          {loading ? (
+            <>
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Memproses...
+            </>
+          ) : (
+            <>
+              Masuk
+              <ArrowRight className="ml-2 size-4" />
+            </>
           )}
-          <span
-            className={`relative inline-flex size-2 rounded-full ${
-              hardwareOnline.connected ? "bg-emerald-500" : "bg-zinc-600"
-            }`}
-          />
-        </span>
-        <TextMorph>
-          {hardwareOnline.connected
-            ? `ESP32 Online (${hardwareOnline.esp32Online}/${hardwareOnline.esp32Total})`
-            : "ESP32 Offline"}
-        </TextMorph>
-      </div>
+        </Button>
+
+        <div className="relative py-1">
+          <div className="absolute inset-0 flex items-center">
+            <span className="w-full border-t border-border" />
+          </div>
+          <div className="relative flex justify-center text-xs">
+            <span className="bg-[#FAFAFA] px-3 text-muted-foreground dark:bg-[#0E0E11]">
+              atau
+            </span>
+          </div>
+        </div>
+
+        <Button
+          type="button"
+          variant="outline"
+          disabled={loading}
+          onClick={() => submitCredentials("teknisi", "teknisi123")}
+          className="h-10 w-full rounded-lg border-border bg-card text-[13.5px] font-medium text-foreground hover:bg-muted"
+        >
+          <KeyRound className="mr-2 size-4 text-muted-foreground" />
+          Masuk sebagai Teknisi Bengkel
+        </Button>
+      </form>
+
+      <p className="text-center text-xs text-muted-foreground">
+        Akun pilot:{" "}
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+          owner / wattwise123
+        </code>{" "}
+        atau{" "}
+        <code className="rounded bg-muted px-1.5 py-0.5 font-mono text-[11px] text-foreground">
+          teknisi / teknisi123
+        </code>
+      </p>
     </div>
   );
 }

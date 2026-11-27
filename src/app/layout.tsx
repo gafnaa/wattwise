@@ -15,8 +15,9 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "WattWise — Audit Energi Pintar",
-  description: "Pemantauan status mesin dan efisiensi daya UMKM mebel.",
+  title: "WattWise — Energy Intelligence",
+  description:
+    "Platform audit energi pintar dan pemantauan mesin real-time berbasis IoT, Machine Learning ISO 14955-5, dan AI.",
 };
 
 export default function RootLayout({
@@ -25,9 +26,10 @@ export default function RootLayout({
   return (
     <html
       lang="id"
-      className={`${geistSans.variable} ${geistMono.variable} dark h-full antialiased`}
+      suppressHydrationWarning
+      className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-orange-500/30 selection:text-orange-100">
+      <body className="min-h-full flex flex-col bg-background text-foreground selection:bg-emerald-500/20 selection:text-emerald-900 dark:selection:text-emerald-100">
         <AppProviders>{children}</AppProviders>
       </body>
     </html>
