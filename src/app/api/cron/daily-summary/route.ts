@@ -121,16 +121,37 @@ export async function POST(request: Request) {
   });
 
   if (overview.dataSource === "database") {
-    await db.telegramNotification
-      .create({
-        data: {
-          workshopId: overview.workshop.id,
-          notificationType: "DAILY_SUMMARY",
-          messageBody,
-          deliveryStatus: tgResult.ok ? "SENT" : "FAILED",
-        },
-      })
-      .catch(() => null);
+    await Promise.all([
+      db.telegramNotification
+        .create({
+          data: {
+            workshopId: overview.workshop.id,
+            notificationType: "DAILY_SUMMARY",
+            messageBody,
+            deliveryStatus: tgResult.ok ? "SENT" : "FAILED",
+          },
+        })
+        .catch(() => null),
+      db.auditReport
+        .create({
+          data: {
+            workshopId: overview.workshop.id,
+            title: `Ringkasan Harian Otomatis — ${overview.workshop.name}`,
+            periodRange: "month",
+            machineScope: "ALL",
+            format: "TELEGRAM",
+            source: "AUTOMATIC",
+            status: tgResult.ok ? "SENT" : "FAILED",
+            totalEnergyKwh: overview.metrics.totalEnergyKwh,
+            totalCostIdr: overview.metrics.totalEnergyCostIdr,
+            idleLossIdr: overview.metrics.idleLossIdr,
+            efficiencyPct: overview.metrics.operationalEfficiencyPct,
+            machineCount: overview.machines.length,
+            createdBy: "Cron Otomatis",
+          },
+        })
+        .catch(() => null),
+    ]);
   }
 
   return NextResponse.json({

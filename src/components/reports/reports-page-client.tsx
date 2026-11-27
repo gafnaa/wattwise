@@ -1,7 +1,18 @@
 "use client";
 
 import * as React from "react";
-import { Calendar, CheckCircle2, FileDown, Loader2, Plus } from "lucide-react";
+import {
+  Calendar,
+  CheckCircle2,
+  FileDown,
+  FileSpreadsheet,
+  FileText,
+  Loader2,
+  Plus,
+  Send,
+  Trash2,
+} from "lucide-react";
+import type { SerializedAuditReport } from "@/app/api/reports/route";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
@@ -15,85 +26,55 @@ import {
 import { StatusPill } from "@/components/ui/wattwise-badges";
 import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
-  calculateWhatIfSavings,
+  formatRupiah,
   INITIAL_MACHINES,
-  PERIOD_METRICS,
   WORKSHOP_INFO,
   type DateRangeKey,
 } from "@/lib/mock-dashboard-data";
 
-interface ReportRecord {
-  id: string;
-  title: string;
-  subtitle: string;
-  status: "READY" | "SCHEDULED";
-  period: string;
-  createdAt: string;
-  range: DateRangeKey;
-  formatLabel: string;
+type ExportFormatChoice = "pdf" | "csv" | "telegram";
+
+const RANGE_LABELS: Record<DateRangeKey, string> = {
+  today: "Hari Ini",
+  week: "7 Hari Terakhir",
+  month: "30 Hari Terakhir",
+};
+
+const FORMAT_LABELS: Record<ExportFormatChoice, string> = {
+  pdf: "PDF Audit Energi (Siap Cetak)",
+  csv: "CSV Audit (Excel Siap Buka)",
+  telegram: "Kirim Ringkasan ke Telegram Bot",
+};
+
+function formatReportDateWib(iso: string): string {
+  const date = new Date(iso);
+  if (Number.isNaN(date.getTime())) return iso;
+  return (
+    new Intl.DateTimeFormat("id-ID", {
+      day: "2-digit",
+      month: "short",
+      hour: "2-digit",
+      minute: "2-digit",
+      timeZone: "Asia/Jakarta",
+    }).format(date) + " WIB"
+  );
 }
 
-function buildDefaultReports(machineCount: number): ReportRecord[] {
-  return [
-    {
-      id: "rep-1",
-      title: "Laporan Mingguan Konsumsi Energi",
-      subtitle: `Otomatis · CSV · ${machineCount} mesin`,
-      status: "READY",
-      period: "7 hari terakhir",
-      createdAt: "Hari ini, 06.00",
-      range: "week",
-      formatLabel: "Unduh CSV",
-    },
-    {
-      id: "rep-2",
-      title: "Laporan Audit Bulanan ISO 14955-5",
-      subtitle: `Otomatis · CSV · ${machineCount} mesin`,
-      status: "READY",
-      period: "30 hari terakhir",
-      createdAt: "1 Nov, 06.00",
-      range: "month",
-      formatLabel: "Unduh CSV",
-    },
-    {
-      id: "rep-3",
-      title: "Ringkasan Operasional Hari Ini",
-      subtitle: `Manual · CSV · ${machineCount} mesin`,
-      status: "READY",
-      period: "Hari ini",
-      createdAt: "Baru diperbarui",
-      range: "today",
-      formatLabel: "Unduh CSV",
-    },
-    {
-      id: "rep-4",
-      title: "Laporan Bulanan Periode Berikutnya",
-      subtitle: `Otomatis · CSV + Telegram · ${machineCount} mesin`,
-      status: "SCHEDULED",
-      period: "Bulan depan",
-      createdAt: "Terjadwal Senin 06.00",
-      range: "month",
-      formatLabel: "Unduh Pratinjau",
-    },
-  ];
+function triggerFileDownload(url: string, filename: string) {
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
 }
 
 export function ReportsPageClient() {
-  const [reports, setReports] = React.useState<ReportRecord[]>(() =>
-    buildDefaultReports(INITIAL_MACHINES.length)
-  );
+  const [reports, setReports] = React.useState<SerializedAuditReport[]>([]);
+  const [loadingReports, setLoadingReports] = React.useState(true);
   const [machines, setMachines] = React.useState(INITIAL_MACHINES);
   const [workshopName, setWorkshopName] = React.useState<string>(
     WORKSHOP_INFO.name
-  );
-  const [tariffIdr, setTariffIdr] = React.useState<number>(
-    WORKSHOP_INFO.tariffIdrPerKwh
-  );
-  const [workingDays, setWorkingDays] = React.useState<number>(
-    WORKSHOP_INFO.workingDaysPerMonth
-  );
-  const [idleLossIdr, setIdleLossIdr] = React.useState<number>(
-    PERIOD_METRICS.month.idleLossIdr
   );
   const [dataSource, setDataSource] = React.useState<"database" | "demo">(
     "database"
@@ -101,105 +82,139 @@ export function ReportsPageClient() {
   const [selectedRange, setSelectedRange] =
     React.useState<DateRangeKey>("month");
   const [selectedScope, setSelectedScope] = React.useState("ALL");
-  const [selectedFormat, setSelectedFormat] = React.useState("csv");
+  const [selectedFormat, setSelectedFormat] =
+    React.useState<ExportFormatChoice>("pdf");
   const [creating, setCreating] = React.useState(false);
+  const [deletingId, setDeletingId] = React.useState<string | null>(null);
   const [statusMessage, setStatusMessage] = React.useState<string | null>(null);
+  const [errorMessage, setErrorMessage] = React.useState<string | null>(null);
 
   React.useEffect(() => {
     let active = true;
-    fetch("/api/dashboard/overview?range=month", { cache: "no-store" })
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d: DashboardOverviewResponse | null) => {
-        if (!active || !d) return;
-        setMachines(d.machines);
-        setWorkshopName(d.workshop.name);
-        setTariffIdr(d.workshop.tariffIdrPerKwh);
-        setWorkingDays(d.workshop.workingDaysPerMonth);
-        setIdleLossIdr(d.metrics.idleLossIdr);
-        setDataSource(d.dataSource);
-        setReports(buildDefaultReports(d.machines.length));
+    Promise.all([
+      fetch("/api/dashboard/overview?range=month", { cache: "no-store" }).then(
+        (r) => (r.ok ? (r.json() as Promise<DashboardOverviewResponse>) : null)
+      ),
+      fetch("/api/reports?limit=25", { cache: "no-store" }).then((r) =>
+        r.ok
+          ? (r.json() as Promise<{
+              dataSource?: "database" | "demo";
+              reports?: SerializedAuditReport[];
+            }>)
+          : null
+      ),
+    ])
+      .then(([overviewData, reportsData]) => {
+        if (!active) return;
+        if (overviewData) {
+          setMachines(overviewData.machines);
+          setWorkshopName(overviewData.workshop.name);
+          setDataSource(overviewData.dataSource);
+        }
+        if (Array.isArray(reportsData?.reports)) {
+          setReports(reportsData.reports);
+        }
       })
-      .catch(() => null);
+      .catch(() => null)
+      .finally(() => {
+        if (active) setLoadingReports(false);
+      });
+
     return () => {
       active = false;
     };
   }, []);
 
-  function downloadAuditCsv(range: DateRangeKey, filename: string) {
-    const a = document.createElement("a");
-    a.href = `/api/export/audit?range=${range}`;
-    a.download = filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  async function createAndPersistReport(params: {
+    range: DateRangeKey;
+    scope: string;
+    format: ExportFormatChoice;
+  }) {
+    setCreating(true);
+    setStatusMessage(null);
+    setErrorMessage(null);
+
+    try {
+      const res = await fetch("/api/reports", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(params),
+      });
+      const json = (await res.json()) as {
+        ok?: boolean;
+        error?: string;
+        persisted?: boolean;
+        telegramMode?: "live" | "simulated";
+        report?: SerializedAuditReport;
+        downloadUrl?: string | null;
+      };
+
+      if (!res.ok || !json.report) {
+        setErrorMessage(json.error ?? "Gagal membuat laporan audit energi.");
+        return;
+      }
+
+      setReports((prev) => [json.report!, ...prev]);
+
+      if (params.format === "telegram") {
+        setStatusMessage(
+          json.report.status === "SENT"
+            ? `Ringkasan audit terkirim ke @wattwise_smart_bot (${json.telegramMode ?? "live"}) dan tersimpan di riwayat.`
+            : "Riwayat tersimpan, namun pengiriman ke Telegram gagal."
+        );
+      } else if (json.downloadUrl) {
+        const ext = params.format === "pdf" ? "pdf" : "csv";
+        const slug = params.scope.toLowerCase().replace(/[^a-z0-9_-]/g, "");
+        triggerFileDownload(
+          json.downloadUrl,
+          `wattwise-audit-${params.range}-${slug}.${ext}`
+        );
+        setStatusMessage(
+          params.format === "pdf"
+            ? "Laporan PDF Audit Energi (ISO 14955-5) berhasil dibuat, disimpan ke Supabase, & diunduh."
+            : "Laporan CSV Audit Energi berhasil dibuat, disimpan ke Supabase, & diunduh."
+        );
+      }
+    } catch {
+      setErrorMessage("Terjadi kesalahan jaringan saat membuat laporan.");
+    } finally {
+      setCreating(false);
+    }
   }
 
   async function handleCreateManualReport(e: React.FormEvent) {
     e.preventDefault();
-    setCreating(true);
-    setStatusMessage(null);
+    await createAndPersistReport({
+      range: selectedRange,
+      scope: selectedScope,
+      format: selectedFormat,
+    });
+  }
+
+  async function handleDeleteReport(id: string) {
+    setDeletingId(id);
     try {
-      const scopeLabel =
-        selectedScope === "ALL"
-          ? `Semua mesin (${machines.length})`
-          : machines.find((m) => m.code === selectedScope)?.name ??
-            selectedScope;
-      const periodLabel =
-        selectedRange === "today"
-          ? "Hari ini"
-          : selectedRange === "week"
-            ? "7 hari terakhir"
-            : "30 hari terakhir";
-
-      const newReport: ReportRecord = {
-        id: `rep-${Date.now()}`,
-        title: `Laporan Manual — ${scopeLabel}`,
-        subtitle: `Manual · ${selectedFormat.toUpperCase()} · ${scopeLabel}`,
-        status: "READY",
-        period: periodLabel,
-        createdAt: new Date().toLocaleTimeString("id-ID", {
-          hour: "2-digit",
-          minute: "2-digit",
-        }),
-        range: selectedRange,
-        formatLabel: "Unduh CSV",
-      };
-      setReports((prev) => [newReport, ...prev]);
-
-      if (selectedFormat === "telegram") {
-        const whatIf30 = calculateWhatIfSavings({
-          idleReductionMinPerDay: 30,
-          startupReductionPct: 35,
-          machines,
-          tariffIdrPerKwh: tariffIdr,
-          workingDaysPerMonth: workingDays,
-        });
-        const res = await fetch("/api/telegram/send-report", {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            idleReductionMinPerDay: 30,
-            startupReductionPct: 35,
-            projectedMonthlySavingIdr: whatIf30.totalSavingIdr,
-            currentIdleLossIdr: idleLossIdr,
-          }),
-        });
-        const j = (await res.json()) as { ok?: boolean };
-        setStatusMessage(
-          j.ok
-            ? "Laporan berhasil dikirim langsung ke @wattwise_smart_bot."
-            : "Gagal mengirim laporan ke Telegram."
-        );
-      } else {
-        downloadAuditCsv(
-          selectedRange,
-          `wattwise-laporan-${selectedRange}-${selectedScope.toLowerCase()}.csv`
-        );
-        setStatusMessage("Laporan CSV audit energi berhasil dibuat & diunduh.");
+      const res = await fetch(`/api/reports?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setReports((prev) => prev.filter((r) => r.id !== id));
       }
     } finally {
-      setCreating(false);
+      setDeletingId(null);
     }
+  }
+
+  function getScopeLabel(scopeCode: string): string {
+    if (scopeCode === "ALL") return `Semua mesin (${machines.length})`;
+    const found = machines.find((m) => m.code === scopeCode);
+    return found ? `${found.name} (${found.code})` : scopeCode;
+  }
+
+  function renderStatusPill(status: SerializedAuditReport["status"]) {
+    if (status === "SENT") return <StatusPill label="Terkirim" tone="blue" />;
+    if (status === "FAILED") return <StatusPill label="Gagal" tone="amber" />;
+    return <StatusPill label="Siap" tone="green" />;
   }
 
   return (
@@ -217,129 +232,264 @@ export function ReportsPageClient() {
               Laporan
             </h1>
             <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
-              Laporan konsumsi energi otomatis dan manual · Format CSV Audit
-              &amp; Telegram
+              Riwayat laporan audit energi tersimpan di Supabase · Ekspor PDF
+              ISO 14955-5, CSV, &amp; Telegram
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            onClick={() =>
-              downloadAuditCsv("month", "wattwise-laporan-bulanan.csv")
-            }
-            className="h-9 gap-1.5 self-start rounded-lg border-border bg-card px-3.5 text-xs font-medium whitespace-nowrap sm:self-auto"
-          >
-            <FileDown className="size-3.5" />
-            <span>Unduh Laporan Terbaru</span>
-          </Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              onClick={() =>
+                triggerFileDownload(
+                  "/api/export/audit?range=month&format=csv&scope=ALL",
+                  "wattwise-audit-bulanan.csv"
+                )
+              }
+              className="h-9 gap-1.5 rounded-lg border-border bg-card px-3 text-xs font-medium whitespace-nowrap"
+            >
+              <FileSpreadsheet className="size-3.5" />
+              <span>Unduh CSV</span>
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              disabled={creating}
+              onClick={() =>
+                void createAndPersistReport({
+                  range: "month",
+                  scope: "ALL",
+                  format: "pdf",
+                })
+              }
+              className="h-9 gap-1.5 rounded-lg bg-[#059669] px-3.5 text-xs font-semibold whitespace-nowrap text-white hover:bg-[#047857]"
+            >
+              <FileDown className="size-3.5" />
+              <span>Ekspor PDF Terbaru</span>
+            </Button>
+          </div>
         </div>
 
         {/* 2-Column Layout */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
-          {/* Left: Daftar Laporan */}
+          {/* Left: Daftar Riwayat Laporan Aktual dari Supabase */}
           <section className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 xl:col-span-8">
-            <div>
-              <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
-                Daftar Laporan
-              </h2>
-              <p className="mt-0.5 text-xs text-muted-foreground">
-                {reports.length} laporan · laporan otomatis dibuat setiap Senin
-                06.00 WIB
-              </p>
+            <div className="flex flex-wrap items-start justify-between gap-2">
+              <div>
+                <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
+                  Riwayat Laporan Audit
+                </h2>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  {loadingReports
+                    ? "Memuat riwayat laporan dari Supabase..."
+                    : `${reports.length} laporan tersimpan · termasuk ringkasan otomatis cron harian`}
+                </p>
+              </div>
             </div>
 
-            {/* Mobile stacked cards (<md) */}
-            <div className="mt-4 divide-y divide-border/70 md:hidden">
-              {reports.map((rep) => (
-                <div key={rep.id} className="space-y-2 py-3.5 text-xs">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="font-semibold text-foreground">
-                        {rep.title}
-                      </p>
-                      <p className="mt-0.5 text-xs text-muted-foreground">
-                        {rep.subtitle}
-                      </p>
-                    </div>
-                    <StatusPill
-                      label={rep.status === "READY" ? "Siap" : "Terjadwal"}
-                      tone={rep.status === "READY" ? "green" : "blue"}
-                    />
-                  </div>
-                  <div className="flex items-center justify-between pt-1">
-                    <span className="text-muted-foreground">
-                      {rep.period} ·{" "}
-                      <span className="font-mono">{rep.createdAt}</span>
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() =>
-                        downloadAuditCsv(rep.range, `wattwise-${rep.id}.csv`)
-                      }
-                      className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
-                    >
-                      {rep.formatLabel}
-                    </button>
-                  </div>
+            {loadingReports ? (
+              <div className="flex items-center justify-center py-14 text-xs text-muted-foreground">
+                <Loader2 className="mr-2 size-4 animate-spin" />
+                Memuat daftar laporan...
+              </div>
+            ) : reports.length === 0 ? (
+              <div className="mt-5 rounded-xl border border-dashed border-border bg-muted/20 px-5 py-10 text-center">
+                <FileText className="mx-auto size-7 text-muted-foreground/70" />
+                <p className="mt-2.5 text-sm font-medium text-foreground">
+                  Belum ada riwayat laporan tersimpan
+                </p>
+                <p className="mx-auto mt-1 max-w-sm text-xs text-muted-foreground">
+                  Buat laporan audit energi pertama dalam format PDF siap cetak
+                  atau CSV menggunakan formulir di samping.
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={creating}
+                  onClick={() =>
+                    void createAndPersistReport({
+                      range: "month",
+                      scope: "ALL",
+                      format: "pdf",
+                    })
+                  }
+                  className="mt-4 h-9 gap-1.5 rounded-lg bg-[#059669] px-3.5 text-xs font-semibold text-white hover:bg-[#047857]"
+                >
+                  <FileDown className="size-3.5" />
+                  <span>Buat Laporan Audit Bulanan (PDF)</span>
+                </Button>
+              </div>
+            ) : (
+              <>
+                {/* Mobile stacked cards (<md) */}
+                <div className="mt-4 divide-y divide-border/70 md:hidden">
+                  {reports.map((rep) => {
+                    const scopeSlug = rep.machineScope
+                      .toLowerCase()
+                      .replace(/[^a-z0-9_-]/g, "");
+                    const pdfUrl = `/api/export/audit?range=${rep.periodRange}&format=pdf&scope=${encodeURIComponent(rep.machineScope)}`;
+                    const csvUrl = `/api/export/audit?range=${rep.periodRange}&format=csv&scope=${encodeURIComponent(rep.machineScope)}`;
+                    return (
+                      <div key={rep.id} className="space-y-2.5 py-3.5 text-xs">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="font-semibold text-foreground">
+                              {rep.title}
+                            </p>
+                            <p className="mt-0.5 text-xs text-muted-foreground">
+                              {rep.source === "AUTOMATIC"
+                                ? "Otomatis"
+                                : "Manual"}{" "}
+                              · {rep.format} ·{" "}
+                              {rep.totalEnergyKwh.toLocaleString("id-ID")} kWh ·
+                              ISO {rep.efficiencyPct}%
+                            </p>
+                          </div>
+                          {renderStatusPill(rep.status)}
+                        </div>
+                        <div className="flex flex-wrap items-center justify-between gap-2 pt-0.5">
+                          <span className="font-mono text-[11px] text-muted-foreground">
+                            {RANGE_LABELS[rep.periodRange]} ·{" "}
+                            {formatReportDateWib(rep.createdAt)}
+                          </span>
+                          <div className="flex items-center gap-3">
+                            <button
+                              type="button"
+                              onClick={() =>
+                                triggerFileDownload(
+                                  pdfUrl,
+                                  `wattwise-audit-${rep.periodRange}-${scopeSlug}.pdf`
+                                )
+                              }
+                              className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
+                            >
+                              PDF
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() =>
+                                triggerFileDownload(
+                                  csvUrl,
+                                  `wattwise-audit-${rep.periodRange}-${scopeSlug}.csv`
+                                )
+                              }
+                              className="font-medium text-muted-foreground hover:text-foreground hover:underline"
+                            >
+                              CSV
+                            </button>
+                            <button
+                              type="button"
+                              disabled={deletingId === rep.id}
+                              onClick={() => void handleDeleteReport(rep.id)}
+                              className="text-muted-foreground hover:text-[#DC2626]"
+                              aria-label="Hapus riwayat laporan"
+                            >
+                              <Trash2 className="size-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      </div>
+                    );
+                  })}
                 </div>
-              ))}
-            </div>
 
-            {/* Desktop/Tablet table (md+) */}
-            <div className="mt-5 hidden overflow-x-auto md:block">
-              <table className="w-full text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                    <th className="pr-4 pb-2.5">Nama laporan</th>
-                    <th className="pr-4 pb-2.5">Status</th>
-                    <th className="pr-4 pb-2.5">Periode</th>
-                    <th className="pr-4 pb-2.5">Dibuat</th>
-                    <th className="pb-2.5 text-right">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/70">
-                  {reports.map((rep) => (
-                    <tr key={rep.id}>
-                      <td className="py-3.5 pr-4">
-                        <p className="font-medium text-foreground">
-                          {rep.title}
-                        </p>
-                        <p className="mt-0.5 text-xs text-muted-foreground">
-                          {rep.subtitle}
-                        </p>
-                      </td>
-                      <td className="py-3.5 pr-4">
-                        <StatusPill
-                          label={rep.status === "READY" ? "Siap" : "Terjadwal"}
-                          tone={rep.status === "READY" ? "green" : "blue"}
-                        />
-                      </td>
-                      <td className="py-3.5 pr-4 text-foreground">
-                        {rep.period}
-                      </td>
-                      <td className="py-3.5 pr-4 font-mono text-muted-foreground">
-                        {rep.createdAt}
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() =>
-                            downloadAuditCsv(
-                              rep.range,
-                              `wattwise-${rep.id}.csv`
-                            )
-                          }
-                          className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
-                        >
-                          {rep.formatLabel}
-                        </button>
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
+                {/* Desktop/Tablet table (md+) */}
+                <div className="mt-5 hidden overflow-x-auto md:block">
+                  <table className="w-full text-left text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                        <th className="pr-4 pb-2.5">Nama laporan</th>
+                        <th className="pr-4 pb-2.5">Status</th>
+                        <th className="pr-4 pb-2.5">Snapshot KPI</th>
+                        <th className="pr-4 pb-2.5">Dibuat</th>
+                        <th className="pb-2.5 text-right">Aksi</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/70">
+                      {reports.map((rep) => {
+                        const scopeSlug = rep.machineScope
+                          .toLowerCase()
+                          .replace(/[^a-z0-9_-]/g, "");
+                        const pdfUrl = `/api/export/audit?range=${rep.periodRange}&format=pdf&scope=${encodeURIComponent(rep.machineScope)}`;
+                        const csvUrl = `/api/export/audit?range=${rep.periodRange}&format=csv&scope=${encodeURIComponent(rep.machineScope)}`;
+                        return (
+                          <tr key={rep.id}>
+                            <td className="py-3.5 pr-4">
+                              <p className="font-medium text-foreground">
+                                {rep.title}
+                              </p>
+                              <p className="mt-0.5 text-xs text-muted-foreground">
+                                {rep.source === "AUTOMATIC"
+                                  ? "Otomatis"
+                                  : "Manual"}{" "}
+                                · {rep.format} · {RANGE_LABELS[rep.periodRange]}
+                              </p>
+                            </td>
+                            <td className="py-3.5 pr-4">
+                              {renderStatusPill(rep.status)}
+                            </td>
+                            <td className="py-3.5 pr-4 font-mono text-[11.5px] text-foreground tabular-nums">
+                              <p>
+                                {rep.totalEnergyKwh.toLocaleString("id-ID")} kWh
+                                · ISO {rep.efficiencyPct}%
+                              </p>
+                              <p className="text-[11px] text-muted-foreground">
+                                Idle {formatRupiah(rep.idleLossIdr)}
+                              </p>
+                            </td>
+                            <td className="py-3.5 pr-4 font-mono text-muted-foreground">
+                              {formatReportDateWib(rep.createdAt)}
+                            </td>
+                            <td className="py-3.5 text-right">
+                              <div className="inline-flex items-center justify-end gap-2.5">
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    triggerFileDownload(
+                                      pdfUrl,
+                                      `wattwise-audit-${rep.periodRange}-${scopeSlug}.pdf`
+                                    )
+                                  }
+                                  className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
+                                >
+                                  PDF
+                                </button>
+                                <span className="text-border">|</span>
+                                <button
+                                  type="button"
+                                  onClick={() =>
+                                    triggerFileDownload(
+                                      csvUrl,
+                                      `wattwise-audit-${rep.periodRange}-${scopeSlug}.csv`
+                                    )
+                                  }
+                                  className="font-medium text-muted-foreground hover:text-foreground hover:underline"
+                                >
+                                  CSV
+                                </button>
+                                <button
+                                  type="button"
+                                  disabled={deletingId === rep.id}
+                                  onClick={() =>
+                                    void handleDeleteReport(rep.id)
+                                  }
+                                  className="ml-1 rounded p-1 text-muted-foreground transition-colors hover:bg-muted hover:text-[#DC2626]"
+                                  aria-label="Hapus riwayat laporan"
+                                  title="Hapus riwayat"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </>
+            )}
           </section>
 
           {/* Right: Buat Laporan Manual */}
@@ -348,7 +498,8 @@ export function ReportsPageClient() {
               Buat Laporan Manual
             </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Ekspor data audit langsung dari Supabase
+              Data audit diambil langsung dari Supabase &amp; disimpan ke
+              riwayat
             </p>
 
             <form
@@ -369,12 +520,12 @@ export function ReportsPageClient() {
                 >
                   <SelectTrigger className="h-10 w-full rounded-lg border-border bg-card text-xs">
                     <Calendar className="mr-1.5 size-3.5 text-muted-foreground" />
-                    <SelectValue />
+                    <SelectValue>{RANGE_LABELS[selectedRange]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="month">30 Hari Terakhir</SelectItem>
-                    <SelectItem value="week">7 Hari Terakhir</SelectItem>
-                    <SelectItem value="today">Hari Ini</SelectItem>
+                    <SelectItem value="month">{RANGE_LABELS.month}</SelectItem>
+                    <SelectItem value="week">{RANGE_LABELS.week}</SelectItem>
+                    <SelectItem value="today">{RANGE_LABELS.today}</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -388,7 +539,7 @@ export function ReportsPageClient() {
                   onValueChange={(v) => setSelectedScope(v ?? "ALL")}
                 >
                   <SelectTrigger className="h-10 w-full rounded-lg border-border bg-card text-xs">
-                    <SelectValue />
+                    <SelectValue>{getScopeLabel(selectedScope)}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="ALL">
@@ -409,26 +560,35 @@ export function ReportsPageClient() {
                 </Label>
                 <Select
                   value={selectedFormat}
-                  onValueChange={(v) => setSelectedFormat(v ?? "csv")}
+                  onValueChange={(v) => {
+                    if (v === "pdf" || v === "csv" || v === "telegram") {
+                      setSelectedFormat(v);
+                    }
+                  }}
                 >
                   <SelectTrigger className="h-10 w-full rounded-lg border-border bg-card text-xs">
-                    <SelectValue />
+                    <SelectValue>{FORMAT_LABELS[selectedFormat]}</SelectValue>
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="csv">
-                      CSV Audit (Excel siap buka)
-                    </SelectItem>
+                    <SelectItem value="pdf">{FORMAT_LABELS.pdf}</SelectItem>
+                    <SelectItem value="csv">{FORMAT_LABELS.csv}</SelectItem>
                     <SelectItem value="telegram">
-                      Kirim Ringkasan ke Telegram Bot
+                      {FORMAT_LABELS.telegram}
                     </SelectItem>
                   </SelectContent>
                 </Select>
               </div>
 
               {statusMessage && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-3 py-2 text-xs text-[#065F46] dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-200">
-                  <CheckCircle2 className="size-3.5 shrink-0" />
+                <div className="flex items-start gap-2 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-3 py-2 text-xs text-[#065F46] dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-200">
+                  <CheckCircle2 className="mt-0.5 size-3.5 shrink-0" />
                   <span>{statusMessage}</span>
+                </div>
+              )}
+
+              {errorMessage && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                  {errorMessage}
                 </div>
               )}
 
@@ -439,10 +599,18 @@ export function ReportsPageClient() {
               >
                 {creating ? (
                   <Loader2 className="mr-1.5 size-3.5 animate-spin" />
+                ) : selectedFormat === "telegram" ? (
+                  <Send className="mr-1.5 size-3.5" />
                 ) : (
                   <Plus className="mr-1.5 size-3.5" />
                 )}
-                <span>Buat laporan</span>
+                <span>
+                  {selectedFormat === "pdf"
+                    ? "Buat & Unduh PDF"
+                    : selectedFormat === "csv"
+                      ? "Buat & Unduh CSV"
+                      : "Kirim ke Telegram Bot"}
+                </span>
               </Button>
             </form>
           </section>
