@@ -5,6 +5,7 @@ import { Download, Gauge, Wallet, Zap } from "lucide-react";
 import { AiInsightCard } from "@/components/dashboard/ai-insight-card";
 import { EnergyConsumptionCard } from "@/components/dashboard/energy-consumption-card";
 import { EnergyPerMachineCard } from "@/components/dashboard/energy-per-machine-card";
+import { ProductionSecCard } from "@/components/analytics/production-sec-card";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { KpiMetricCard } from "@/components/ui/wattwise-badges";
@@ -158,13 +159,20 @@ export function AnalyticsPageClient() {
 
         {/* Bottom 2-Col: Energy Per Machine + AI Insight */}
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <EnergyPerMachineCard
-            machines={overview.machines}
-            tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
-            periodLabel={overview.metrics.label}
-          />
-          <AiInsightCard actionLogs={overview.actionLogs} />
+          <div className="min-w-0">
+            <EnergyPerMachineCard
+              machines={overview.machines}
+              tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
+              periodLabel={overview.metrics.label}
+            />
+          </div>
+          <div className="min-w-0">
+            <AiInsightCard actionLogs={overview.actionLogs} />
+          </div>
         </section>
+
+        {/* Specific Energy Consumption (SEC: kWh / unit produk) */}
+        <ProductionSecCard />
       </div>
     </AppShell>
   );

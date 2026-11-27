@@ -13,6 +13,7 @@
     "ml:train": "tsx ml/train-baseline.ts",
     "iot:simulate": "tsx scripts/simulate-esp32.ts",
     "telegram:poll": "tsx scripts/telegram-poll.ts",
+    "cron:daily": "tsx scripts/run-daily-cron.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",

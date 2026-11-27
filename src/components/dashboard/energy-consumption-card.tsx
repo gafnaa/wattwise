@@ -20,27 +20,27 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { DataSourceBadge } from "@/components/ui/wattwise-badges";
-import {
-  formatRupiah,
-  type MachineCardData,
-} from "@/lib/mock-dashboard-data";
+import type {
+  EnergyTimeseriesPoint,
+  TimeseriesGranularity,
+} from "@/lib/audit/timeseries";
+import { formatRupiah, type MachineCardData } from "@/lib/mock-dashboard-data";
 
-type Granularity = "daily" | "weekly" | "monthly";
-
-interface ChartPoint {
-  label: string;
-  fullDate: string;
-  currentKwh: number;
-  previousKwh: number;
-  estCostIdr: number;
+interface TimeseriesApiResponse {
+  dataSource: "database" | "demo";
+  granularity: TimeseriesGranularity;
+  machineCode: string;
+  tariffIdrPerKwh: number;
+  hasPreviousData?: boolean;
+  series: EnergyTimeseriesPoint[];
 }
 
-function buildEnergySeries(params: {
-  granularity: Granularity;
+function buildFallbackSeries(params: {
+  granularity: TimeseriesGranularity;
   totalKwh: number;
   tariffIdrPerKwh: number;
   machineScale: number;
-}): ChartPoint[] {
+}): EnergyTimeseriesPoint[] {
   const { granularity, totalKwh, tariffIdrPerKwh, machineScale } = params;
   const scaledTotal = Math.max(12, totalKwh * machineScale);
 
@@ -52,10 +52,13 @@ function buildEnergySeries(params: {
       const currentKwh = Number((base * f).toFixed(1));
       const previousKwh = Number((base * prevFactors[idx]).toFixed(1));
       return {
+        bucketKey: `week-${idx + 1}`,
         label: `Minggu ${idx + 1}`,
         fullDate: `Minggu ke-${idx + 1} · Periode Aktif`,
         currentKwh,
         previousKwh,
+        workingKwh: Number((currentKwh * 0.78).toFixed(1)),
+        idleKwh: Number((currentKwh * 0.2).toFixed(1)),
         estCostIdr: Math.round(currentKwh * tariffIdrPerKwh),
       };
     });
@@ -69,10 +72,13 @@ function buildEnergySeries(params: {
       const currentKwh = Number((scaledTotal * factors[idx]).toFixed(1));
       const previousKwh = Number((scaledTotal * prevFactors[idx]).toFixed(1));
       return {
+        bucketKey: `month-${idx + 1}`,
         label: m,
         fullDate: `Bulan ${m} 2026`,
         currentKwh,
         previousKwh,
+        workingKwh: Number((currentKwh * 0.78).toFixed(1)),
+        idleKwh: Number((currentKwh * 0.2).toFixed(1)),
         estCostIdr: Math.round(currentKwh * tariffIdrPerKwh),
       };
     });
@@ -102,32 +108,19 @@ function buildEnergySeries(params: {
     "26",
     "27 Nov",
   ];
-  const fullDates = [
-    "Sabtu, 14 Nov 2026",
-    "Minggu, 15 Nov 2026",
-    "Senin, 16 Nov 2026",
-    "Selasa, 17 Nov 2026",
-    "Rabu, 18 Nov 2026",
-    "Kamis, 19 Nov 2026",
-    "Jumat, 20 Nov 2026",
-    "Sabtu, 21 Nov 2026",
-    "Minggu, 22 Nov 2026",
-    "Senin, 23 Nov 2026",
-    "Selasa, 24 Nov 2026",
-    "Rabu, 25 Nov 2026",
-    "Kamis, 26 Nov 2026",
-    "Jumat, 27 Nov 2026",
-  ];
   const dailyBase = Math.max(18, scaledTotal / 26);
 
   return dailyFactors.map((f, idx) => {
     const currentKwh = Number((dailyBase * f).toFixed(1));
     const previousKwh = Number((dailyBase * prevDailyFactors[idx]).toFixed(1));
     return {
+      bucketKey: `day-${idx + 1}`,
       label: dayLabels[idx] ?? `H-${dailyFactors.length - idx}`,
-      fullDate: fullDates[idx] ?? `Hari ke-${idx + 1}`,
+      fullDate: `Hari ${dayLabels[idx] ?? idx + 1}`,
       currentKwh,
       previousKwh,
+      workingKwh: Number((currentKwh * 0.78).toFixed(1)),
+      idleKwh: Number((currentKwh * 0.2).toFixed(1)),
       estCostIdr: Math.round(currentKwh * tariffIdrPerKwh),
     };
   });
@@ -151,9 +144,47 @@ export function EnergyConsumptionCard({
     () => true,
     () => false
   );
-  const [granularity, setGranularity] = React.useState<Granularity>("daily");
+  const [granularity, setGranularity] =
+    React.useState<TimeseriesGranularity>("daily");
   const [selectedMachine, setSelectedMachine] = React.useState<string>("ALL");
   const [comparePeriod, setComparePeriod] = React.useState<boolean>(true);
+  const [dbSeries, setDbSeries] = React.useState<EnergyTimeseriesPoint[] | null>(
+    null
+  );
+  const [hasDbPrevious, setHasDbPrevious] = React.useState<boolean>(true);
+  const [seriesSource, setSeriesSource] = React.useState<"database" | "demo">(
+    "demo"
+  );
+
+  React.useEffect(() => {
+    let active = true;
+    const params = new URLSearchParams({
+      granularity,
+      machineCode: selectedMachine,
+    });
+    fetch(`/api/analytics/timeseries?${params.toString()}`, {
+      cache: "no-store",
+    })
+      .then((res) => (res.ok ? (res.json() as Promise<TimeseriesApiResponse>) : null))
+      .then((payload) => {
+        if (!active || !payload) return;
+        if (payload.dataSource === "database" && payload.series.length > 0) {
+          setDbSeries(payload.series);
+          setHasDbPrevious(Boolean(payload.hasPreviousData));
+          setSeriesSource("database");
+        } else {
+          setDbSeries(null);
+          setSeriesSource("demo");
+        }
+      })
+      .catch(() => {
+        if (active) setDbSeries(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [granularity, selectedMachine]);
 
   const totalRatedW = React.useMemo(
     () => machines.reduce((s, m) => s + m.ratedPowerW, 0) || 1,
@@ -166,16 +197,18 @@ export function EnergyConsumptionCard({
     return found ? Math.max(0.08, found.ratedPowerW / totalRatedW) : 1;
   }, [machines, selectedMachine, totalRatedW]);
 
-  const series = React.useMemo(
-    () =>
-      buildEnergySeries({
-        granularity,
-        totalKwh: totalEnergyKwh,
-        tariffIdrPerKwh,
-        machineScale,
-      }),
-    [granularity, machineScale, tariffIdrPerKwh, totalEnergyKwh]
-  );
+  const series = React.useMemo(() => {
+    if (dbSeries && dbSeries.length > 0) return dbSeries;
+    return buildFallbackSeries({
+      granularity,
+      totalKwh: totalEnergyKwh,
+      tariffIdrPerKwh,
+      machineScale,
+    });
+  }, [dbSeries, granularity, machineScale, tariffIdrPerKwh, totalEnergyKwh]);
+
+  const showComparisonLine =
+    comparePeriod && (seriesSource === "demo" || hasDbPrevious);
 
   return (
     <div className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
@@ -188,10 +221,14 @@ export function EnergyConsumptionCard({
             <DataSourceBadge kind="sensor" />
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Total konsumsi{" "}
+            {seriesSource === "database"
+              ? "Agregasi aktual Supabase"
+              : "Estimasi konsumsi"}{" "}
+            ·{" "}
             {selectedMachine === "ALL"
               ? "seluruh mesin"
-              : machines.find((m) => m.code === selectedMachine)?.name ?? "mesin"}{" "}
+              : machines.find((m) => m.code === selectedMachine)?.name ??
+                "mesin"}{" "}
             per{" "}
             {granularity === "daily"
               ? "hari"
@@ -252,7 +289,7 @@ export function EnergyConsumptionCard({
             <span className="h-0.5 w-3.5 rounded-full bg-[#059669]" />
             <span>Periode ini</span>
           </span>
-          {comparePeriod && (
+          {showComparisonLine && (
             <span className="inline-flex items-center gap-1.5">
               <span className="h-0.5 w-3.5 border-t-2 border-dashed border-zinc-400" />
               <span>Periode sebelumnya</span>
@@ -302,9 +339,9 @@ export function EnergyConsumptionCard({
               <Tooltip
                 content={({ active, payload }) => {
                   if (!active || !payload?.length) return null;
-                  const row = payload[0]?.payload as ChartPoint;
+                  const row = payload[0]?.payload as EnergyTimeseriesPoint;
                   return (
-                    <div className="min-w-[190px] rounded-xl border border-border bg-popover p-3 text-xs shadow-lg">
+                    <div className="min-w-[205px] rounded-xl border border-border bg-popover p-3 text-xs shadow-lg">
                       <p className="font-semibold text-foreground">
                         {row.fullDate}
                       </p>
@@ -312,13 +349,20 @@ export function EnergyConsumptionCard({
                         <div className="flex items-center justify-between gap-4">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
                             <span className="size-1.5 rounded-full bg-[#059669]" />
-                            Periode ini
+                            Total periode ini
                           </span>
                           <span className="font-mono font-medium text-foreground">
                             {row.currentKwh.toLocaleString("id-ID")} kWh
                           </span>
                         </div>
-                        {comparePeriod && (
+                        <div className="flex items-center justify-between gap-4 text-[11px] text-muted-foreground">
+                          <span>Working / Idle</span>
+                          <span className="font-mono">
+                            {row.workingKwh.toLocaleString("id-ID")} /{" "}
+                            {row.idleKwh.toLocaleString("id-ID")} kWh
+                          </span>
+                        </div>
+                        {showComparisonLine && (
                           <div className="flex items-center justify-between gap-4">
                             <span className="flex items-center gap-1.5 text-muted-foreground">
                               <span className="size-1.5 rounded-full bg-zinc-400" />
@@ -342,7 +386,7 @@ export function EnergyConsumptionCard({
                   );
                 }}
               />
-              {comparePeriod && (
+              {showComparisonLine && (
                 <Area
                   type="monotone"
                   dataKey="previousKwh"
