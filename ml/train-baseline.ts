@@ -1,6 +1,11 @@
+import "dotenv/config";
 import fs from "node:fs";
 import path from "node:path";
 import { extractFeatures } from "../src/lib/ml/features";
+import {
+  fetchSpreadsheetDataset,
+  parseSpreadsheetDatasetCsv,
+} from "../src/lib/ml/spreadsheet-dataset";
 import {
   FEATURE_NAMES,
   MACHINE_STATUS_CLASSES,
@@ -29,8 +34,26 @@ function gaussian(rng: () => number, mean: number, std: number): number {
 }
 
 // =============================================================================
-// 1. Generator Dataset Time-Series ISO 14955-5 (6 Mesin Mebel)
-//    Format dasar identik dengan 3 kolom dari hardware: (index, timestamp, powerW)
+// CLI Argument Helpers
+// =============================================================================
+function getCliArg(name: string): string | undefined {
+  const prefix = `--${name}=`;
+  const idx = process.argv.findIndex(
+    (arg) => arg === `--${name}` || arg.startsWith(prefix)
+  );
+  if (idx === -1) return undefined;
+  const raw = process.argv[idx];
+  if (raw.startsWith(prefix)) return raw.slice(prefix.length);
+  const next = process.argv[idx + 1];
+  return next && !next.startsWith("--") ? next : undefined;
+}
+
+function hasCliFlag(name: string): boolean {
+  return process.argv.includes(`--${name}`);
+}
+
+// =============================================================================
+// 1. Generator Dataset Time-Series ISO 14955-5 (6 Mesin Mebel — Fallback)
 // =============================================================================
 interface MachineProfile {
   code: string;
@@ -120,14 +143,12 @@ function generateSyntheticDataset(rng: () => number): LabeledRow[] {
 
     // 14 siklus kerja realistis per mesin
     for (let cycle = 0; cycle < 14; cycle++) {
-      // 1. OFF (10-14 sampel)
       const offSteps = 10 + Math.floor(rng() * 5);
       for (let i = 0; i < offSteps; i++) {
         const p = Math.max(0, gaussian(rng, 0.004, 0.003) * profile.ratedPowerW);
         pushSample(p, "OFF");
       }
 
-      // 2. START_UP (3-5 sampel: lonjakan arus inrush dari OFF lalu melandai)
       const startupSteps = 3 + Math.floor(rng() * 3);
       for (let i = 0; i < startupSteps; i++) {
         const decay = 1 - i * 0.08;
@@ -135,14 +156,12 @@ function generateSyntheticDataset(rng: () => number): LabeledRow[] {
         pushSample(ratio * profile.ratedPowerW, "START_UP");
       }
 
-      // 3. IDLE awal sebelum potong material (10-14 sampel: daya datar / std rendah)
       const idle1Steps = 10 + Math.floor(rng() * 5);
       for (let i = 0; i < idle1Steps; i++) {
         const ratio = gaussian(rng, profile.idleRatio, 0.012);
         pushSample(ratio * profile.ratedPowerW, "IDLE");
       }
 
-      // 4. WORKING (16-22 sampel: beban pemotongan kayu berfluktuasi / std tinggi)
       const workSteps = 16 + Math.floor(rng() * 7);
       for (let i = 0; i < workSteps; i++) {
         const cuttingWave = Math.sin(i * 1.15) * 0.09;
@@ -153,7 +172,6 @@ function generateSyntheticDataset(rng: () => number): LabeledRow[] {
         );
       }
 
-      // 5. IDLE pasca potong (10-14 sampel)
       const idle2Steps = 10 + Math.floor(rng() * 5);
       for (let i = 0; i < idle2Steps; i++) {
         const ratio = gaussian(rng, profile.idleRatio, 0.014);
@@ -166,9 +184,43 @@ function generateSyntheticDataset(rng: () => number): LabeledRow[] {
 }
 
 // =============================================================================
-// 2. CART Decision Tree & Random Forest Trainer (Gini Impurity + Bagging)
+// 2. Stratified 80/20 Split + CART Decision Tree & Random Forest Trainer
 // =============================================================================
 const NUM_CLASSES = MACHINE_STATUS_CLASSES.length;
+
+function stratifiedTrainTestSplit(
+  dataset: LabeledRow[],
+  rng: () => number,
+  trainRatio = 0.8
+): { trainRows: LabeledRow[]; testRows: LabeledRow[] } {
+  const byClass: LabeledRow[][] = Array.from({ length: NUM_CLASSES }, () => []);
+  for (const row of dataset) {
+    byClass[row.labelIdx].push(row);
+  }
+
+  const trainRows: LabeledRow[] = [];
+  const testRows: LabeledRow[] = [];
+
+  for (const bucket of byClass) {
+    for (let i = bucket.length - 1; i > 0; i--) {
+      const j = Math.floor(rng() * (i + 1));
+      [bucket[i], bucket[j]] = [bucket[j], bucket[i]];
+    }
+    if (bucket.length === 0) continue;
+    if (bucket.length === 1) {
+      trainRows.push(bucket[0]);
+      continue;
+    }
+    const split = Math.max(
+      1,
+      Math.min(bucket.length - 1, Math.floor(bucket.length * trainRatio))
+    );
+    trainRows.push(...bucket.slice(0, split));
+    testRows.push(...bucket.slice(split));
+  }
+
+  return { trainRows, testRows };
+}
 
 function classDistribution(indices: number[], rows: LabeledRow[]): number[] {
   const counts = new Array<number>(NUM_CLASSES).fill(0);
@@ -219,7 +271,6 @@ function buildCartTree(
       return nodeIdx;
     }
 
-    // Pilih subset fitur acak (Random Subspace Method)
     const allFeatureIds = FEATURE_NAMES.map((_, i) => i);
     for (let i = allFeatureIds.length - 1; i > 0; i--) {
       const j = Math.floor(rng() * (i + 1));
@@ -289,7 +340,6 @@ function buildCartTree(
       }
     }
 
-    // Reserve current node slot before recursing
     nodes.push({
       featureIndex: bestFeature,
       threshold: Number(bestThreshold.toFixed(6)),
@@ -332,28 +382,73 @@ function predictEnsembleClass(trees: RfTreeNode[][], features: number[]): number
   return bestCls;
 }
 
-function main() {
+async function main() {
   const rng = createRng(20261126);
-  const dataset = generateSyntheticDataset(rng);
 
-  // Shuffle deterministik + split 80/20
-  for (let i = dataset.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [dataset[i], dataset[j]] = [dataset[j], dataset[i]];
+  const sheetUrl =
+    getCliArg("sheet") ??
+    getCliArg("url") ??
+    process.env.ML_DATASET_SHEET_URL?.trim();
+  const localCsvPath = getCliArg("csv");
+  const gid = getCliArg("gid");
+  const sheetName = getCliArg("sheet-name");
+  const defaultRatedPowerW = Number(getCliArg("rated-power") ?? "3800") || 3800;
+  const defaultMachineCode = getCliArg("machine") ?? "MESIN-01";
+  const autoLabel = hasCliFlag("auto-label");
+  const nEstimators = Math.max(5, Math.min(100, Number(getCliArg("trees") ?? "25") || 25));
+  const maxDepth = Math.max(3, Math.min(15, Number(getCliArg("max-depth") ?? "7") || 7));
+  const outArg = getCliArg("out");
+
+  let dataset: LabeledRow[];
+  let trainedWith =
+    "wattwise-baseline-cart-rf (compatible with scikit-learn Colab export)";
+  let sourceSummary = "Synthetic ISO 14955-5 (6 mesin furnitur)";
+
+  if (sheetUrl) {
+    console.log(`[ML] Mengambil dataset dari Google Sheets / URL...`);
+    const fetched = await fetchSpreadsheetDataset(sheetUrl, {
+      gid,
+      sheetName,
+      defaultRatedPowerW,
+      defaultMachineCode,
+      autoLabelIfMissingStatus: autoLabel,
+    });
+    dataset = fetched.rows;
+    trainedWith = fetched.usedAutoLabel
+      ? "google-sheets-cart-rf (auto-labeled ISO 14955-5)"
+      : "google-sheets-cart-rf";
+    sourceSummary = `${fetched.csvUrl} (mesin: ${fetched.machineCodes.join(", ")}, baris mentah: ${fetched.rawRowCount}, dilewati: ${fetched.skippedRowCount})`;
+    console.log(`[ML] Header terdeteksi : ${fetched.detectedHeaders.join(", ")}`);
+    console.log(`[ML] Distribusi kelas  :`, fetched.classCounts);
+    if (fetched.usedAutoLabel) {
+      console.warn(
+        "[ML] Peringatan: Kolom 'status' tidak ada; label dibuat otomatis berbasis aturan ISO 14955-5 (--auto-label)."
+      );
+    }
+  } else if (localCsvPath) {
+    const resolvedCsv = path.resolve(process.cwd(), localCsvPath);
+    const csvText = fs.readFileSync(resolvedCsv, "utf-8");
+    const parsed = parseSpreadsheetDatasetCsv(csvText, {
+      defaultRatedPowerW,
+      defaultMachineCode,
+      autoLabelIfMissingStatus: autoLabel,
+    });
+    dataset = parsed.rows;
+    trainedWith = parsed.usedAutoLabel
+      ? "local-csv-cart-rf (auto-labeled ISO 14955-5)"
+      : "local-csv-cart-rf";
+    sourceSummary = `${resolvedCsv} (mesin: ${parsed.machineCodes.join(", ")}, baris mentah: ${parsed.rawRowCount})`;
+    console.log(`[ML] Distribusi kelas  :`, parsed.classCounts);
+  } else {
+    dataset = generateSyntheticDataset(rng);
   }
 
-  const splitIdx = Math.floor(dataset.length * 0.8);
-  const trainRows = dataset.slice(0, splitIdx);
-  const testRows = dataset.slice(splitIdx);
-
-  const nEstimators = 25;
-  const maxDepth = 7;
-  const minSamplesLeaf = 4;
+  const { trainRows, testRows } = stratifiedTrainTestSplit(dataset, rng, 0.8);
+  const minSamplesLeaf = Math.max(2, Math.min(4, Math.floor(trainRows.length / 40)));
   const maxFeatures = 3;
 
   const trees: RfTreeNode[][] = [];
   for (let t = 0; t < nEstimators; t++) {
-    // Bootstrap sampling
     const bootIndices: number[] = [];
     for (let i = 0; i < trainRows.length; i++) {
       bootIndices.push(Math.floor(rng() * trainRows.length));
@@ -370,7 +465,6 @@ function main() {
     );
   }
 
-  // Evaluasi pada test set
   const confusion: number[][] = Array.from({ length: NUM_CLASSES }, () =>
     new Array<number>(NUM_CLASSES).fill(0)
   );
@@ -381,7 +475,7 @@ function main() {
     if (pred === row.labelIdx) correct++;
   }
 
-  const accuracy = correct / testRows.length;
+  const accuracy = testRows.length > 0 ? correct / testRows.length : 1;
   const perClassF1 = {} as Record<MachineStatus, number>;
   for (let c = 0; c < NUM_CLASSES; c++) {
     const tp = confusion[c][c];
@@ -396,7 +490,7 @@ function main() {
     modelType: "RandomForestClassifier",
     standard: "ISO 14955-5:2020",
     trainedAt: new Date().toISOString(),
-    trainedWith: "wattwise-baseline-cart-rf (compatible with scikit-learn Colab export)",
+    trainedWith,
     classes: [...MACHINE_STATUS_CLASSES],
     featureNames: [...FEATURE_NAMES],
     nEstimators,
@@ -410,10 +504,14 @@ function main() {
     trees,
   };
 
-  const outPath = path.resolve(process.cwd(), "src/lib/ml/rf-model.json");
+  const outPath = path.resolve(
+    process.cwd(),
+    outArg ?? "src/lib/ml/rf-model.json"
+  );
   fs.writeFileSync(outPath, JSON.stringify(artifact), "utf-8");
 
-  console.log("=== WattWise Random Forest Baseline Training ===");
+  console.log("=== WattWise Random Forest Training ===");
+  console.log(`Sumber data   : ${sourceSummary}`);
   console.log(`Total samples : ${dataset.length} (train: ${trainRows.length}, test: ${testRows.length})`);
   console.log(`Trees / Depth : ${nEstimators} trees, maxDepth=${maxDepth}`);
   console.log(`Test Accuracy : ${(accuracy * 100).toFixed(2)}%`);
@@ -425,4 +523,7 @@ function main() {
   console.log(`Saved model   : ${outPath} (${(fs.statSync(outPath).size / 1024).toFixed(1)} KB)`);
 }
 
-main();
+main().catch((err) => {
+  console.error("[ML Training Error]", err instanceof Error ? err.message : err);
+  process.exit(1);
+});
