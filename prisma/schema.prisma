@@ -165,17 +165,19 @@ model TelemetryReading {
   powerW           Float         @map("power_w") // Atribut wajib (Watt)
   voltageV         Float?        @map("voltage_v") // Opsional dari PZEM-004T
   currentA         Float?        @map("current_a") // Opsional dari PZEM-004T
-  energyKwh        Float?        @map("energy_kwh") // Opsional (atau hasil integrasi daya x dt)
-  frequencyHz      Float?        @map("frequency_hz") // Opsional dari PZEM-004T
-  powerFactor      Float?        @map("power_factor") // Opsional dari PZEM-004T
-  predictedStatus  MachineStatus @default(OFF) @map("predicted_status")
-  statusConfidence Float?        @map("status_confidence")
-  isSimulated      Boolean       @default(false) @map("is_simulated")
-  createdAt        DateTime      @default(now()) @map("created_at")
+  energyKwh           Float?        @map("energy_kwh") // Energi delta (kWh) pada interval sampel ini
+  cumulativeEnergyKwh Float?        @map("cumulative_energy_kwh") // Nilai meter kumulatif mentah dari PZEM-004T (opsional)
+  frequencyHz         Float?        @map("frequency_hz") // Opsional dari PZEM-004T
+  powerFactor         Float?        @map("power_factor") // Opsional dari PZEM-004T
+  predictedStatus     MachineStatus @default(OFF) @map("predicted_status")
+  statusConfidence    Float?        @map("status_confidence")
+  isSimulated         Boolean       @default(false) @map("is_simulated")
+  createdAt           DateTime      @default(now()) @map("created_at")
 
   device  Device? @relation(fields: [deviceId], references: [id], onDelete: SetNull)
   machine Machine @relation(fields: [machineId], references: [id], onDelete: Cascade)
 
+  @@unique([deviceId, recordedAt])
   @@index([machineId, recordedAt(sort: Desc)])
   @@index([deviceId, recordedAt(sort: Desc)])
   @@index([recordedAt(sort: Desc)])

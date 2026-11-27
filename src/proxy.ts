@@ -1,7 +1,16 @@
 import { NextResponse, type NextRequest } from "next/server";
 import { SESSION_COOKIE_NAME, verifySessionToken } from "@/lib/auth";
 
-const PROTECTED_PAGES = ["/dashboard", "/machines", "/actions", "/settings"];
+const PROTECTED_PAGES = [
+  "/dashboard",
+  "/machines",
+  "/analytics",
+  "/actions",
+  "/reports",
+  "/management/machines",
+  "/devices",
+  "/settings",
+];
 
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
@@ -35,7 +44,11 @@ export const config = {
   matcher: [
     "/dashboard/:path*",
     "/machines/:path*",
+    "/analytics/:path*",
     "/actions/:path*",
+    "/reports/:path*",
+    "/management/:path*",
+    "/devices/:path*",
     "/settings/:path*",
   ],
 };
