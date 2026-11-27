@@ -18,10 +18,10 @@ export default function LoginPage() {
           className="opacity-100"
         />
 
-        {/* Targeted Bottom Scrim ONLY behind text — keeps sunlit windows, greenery & CNC vibrant */}
+        {/* Balanced Scrim for crisp centered typography while keeping workshop dither vibrant */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B]/88 via-[#09090B]/40 via-38% to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#09090B]/20 via-[#09090B]/58 to-[#09090B]/78"
         />
 
         {/* Brand Pill */}
@@ -39,22 +39,23 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Lower Editorial Copy */}
-        <div className="relative z-10 mt-36 max-w-lg space-y-5 lg:mt-auto lg:pt-32">
-          <div className="space-y-3">
-            <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-[40px] sm:leading-[1.12]">
+        {/* Centered Editorial Copy */}
+        <div className="relative z-10 my-auto max-w-lg py-16 lg:py-0">
+          <div className="space-y-3.5">
+            <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white drop-shadow-[0_2px_14px_rgba(0,0,0,0.7)] sm:text-[42px] sm:leading-[1.12]">
               Pantau dan hemat energi pabrik Anda secara real-time
             </h1>
-            <p className="text-sm leading-relaxed text-zinc-100/95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)] sm:text-[15px]">
+            <p className="text-sm leading-relaxed text-zinc-100/95 drop-shadow-[0_1px_8px_rgba(0,0,0,0.65)] sm:text-[15.5px]">
               Satu ruang kerja untuk memantau beban listrik mesin, mendeteksi
               pemborosan idle, dan menindaklanjuti rekomendasi audit energi.
             </p>
           </div>
-
-          <p className="pt-1 text-xs text-zinc-300/85">
-            WattWise Smart Energy Audit · Sentra Furnitur &amp; Manufaktur
-          </p>
         </div>
+
+        {/* Footer Caption */}
+        <p className="relative z-10 text-xs text-zinc-300/85">
+          WattWise Smart Energy Audit · Sentra Furnitur &amp; Manufaktur
+        </p>
       </section>
 
       {/* Right Login Surface */}
