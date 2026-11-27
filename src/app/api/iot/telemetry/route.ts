@@ -1,5 +1,4 @@
 import { NextResponse } from "next/server";
-import { z } from "zod";
 import { hashDeviceApiKey, timingSafeEqualHex } from "@/lib/auth";
 import {
   calculateCostIdr,
@@ -11,44 +10,10 @@ import {
 } from "@/lib/audit/recommendations";
 import { calculateVirtualSensorPower } from "@/lib/audit/virtual-sensor";
 import { db } from "@/lib/db";
+import { telemetryBodySchema } from "@/lib/iot/telemetry-schema";
 import { classifyTelemetryWindow } from "@/lib/ml/classifier";
 import type { HysteresisState, PowerSample } from "@/lib/ml/types";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
-
-/**
- * Mendukung 2 format payload ESP32:
- * 1) Format ringkas 3-kolom hardware (index, timestamp, daya / power_w)
- * 2) Format lengkap PZEM-004T (`metrics: { voltage_v, current_a, power_w, ... }`)
- */
-const telemetryItemSchema = z.object({
-  device_uid: z.string().min(1).optional(),
-  index: z.number().int().optional(),
-  sample_index: z.number().int().optional(),
-  timestamp: z.union([z.string(), z.number()]).optional(),
-  recorded_at: z.union([z.string(), z.number()]).optional(),
-  daya: z.number().nonnegative().optional(),
-  power_w: z.number().nonnegative().optional(),
-  firmware_version: z.string().optional(),
-  is_simulated: z.boolean().optional(),
-  metrics: z
-    .object({
-      voltage_v: z.number().nonnegative().optional(),
-      current_a: z.number().nonnegative().optional(),
-      power_w: z.number().nonnegative(),
-      energy_kwh: z.number().nonnegative().optional(),
-      frequency_hz: z.number().nonnegative().optional(),
-      power_factor: z.number().min(0).max(1).optional(),
-    })
-    .optional(),
-});
-
-const telemetryBodySchema = z.union([
-  telemetryItemSchema,
-  z.object({
-    device_uid: z.string().min(1).optional(),
-    readings: z.array(telemetryItemSchema).min(1).max(100),
-  }),
-]);
 
 export async function POST(request: Request) {
   try {
