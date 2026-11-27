@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import {
   INITIAL_MACHINES,
@@ -162,6 +162,11 @@ export async function GET() {
 }
 
 export async function PATCH(request: Request) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = updateSettingsSchema.safeParse(rawBody);
 
@@ -174,8 +179,6 @@ export async function PATCH(request: Request) {
       { status: 400 }
     );
   }
-
-  const session = await getCurrentSession();
 
   try {
     const workshop = session?.workshopId

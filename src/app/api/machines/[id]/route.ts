@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 
 const updateMachineSchema = z.object({
@@ -20,6 +21,11 @@ export async function PATCH(
   request: Request,
   context: { params: Promise<{ id: string }> }
 ) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const { id } = await context.params;
   const rawBody = await request.json().catch(() => null);
   const parsed = updateMachineSchema.safeParse(rawBody);
@@ -35,8 +41,31 @@ export async function PATCH(
   }
 
   try {
+    const workshop = session?.workshopId
+      ? await db.workshop.findUnique({ where: { id: session.workshopId } })
+      : await db.workshop.findFirst({ orderBy: { createdAt: "asc" } });
+
+    if (!workshop) {
+      return NextResponse.json({
+        ok: true,
+        persisted: false,
+        machine: { id, ...parsed.data },
+      });
+    }
+
+    const existing = await db.machine.findFirst({
+      where: { id, workshopId: workshop.id },
+      select: { id: true },
+    });
+    if (!existing) {
+      return NextResponse.json(
+        { error: "Mesin tidak ditemukan pada workshop ini." },
+        { status: 404 }
+      );
+    }
+
     const updated = await db.machine.update({
-      where: { id },
+      where: { id: existing.id },
       data: parsed.data,
     });
     return NextResponse.json({

@@ -13,6 +13,10 @@ import {
 } from "@/components/ui/wattwise-badges";
 import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
+  mergeStreamSnapshotIntoMachines,
+  type StreamMachineSnapshot,
+} from "@/lib/stream/merge-snapshot";
+import {
   INITIAL_ACTION_LOGS,
   INITIAL_MACHINES,
   PERIOD_METRICS,
@@ -218,17 +222,33 @@ export function MachinesPageClient() {
       .catch(() => null);
 
     const es = new EventSource("/api/stream");
-    es.addEventListener("telemetry", (ev) => {
+    const handleStreamSnapshot = (ev: Event) => {
       try {
         const parsed = JSON.parse((ev as MessageEvent).data) as {
-          machines?: MachineCardData[];
+          machines?: StreamMachineSnapshot[];
           virtualSensor?: DashboardOverviewResponse["virtualSensor"];
+          esp32OnlineCount?: number;
+          esp32TotalCount?: number;
           timestamp?: string;
         };
         if (Array.isArray(parsed.machines) && parsed.machines.length > 0) {
           setOverview((prev) => ({
             ...prev,
-            machines: parsed.machines!,
+            workshop: {
+              ...prev.workshop,
+              esp32OnlineCount:
+                typeof parsed.esp32OnlineCount === "number"
+                  ? parsed.esp32OnlineCount
+                  : prev.workshop.esp32OnlineCount,
+              esp32TotalCount:
+                typeof parsed.esp32TotalCount === "number"
+                  ? parsed.esp32TotalCount
+                  : prev.workshop.esp32TotalCount,
+            },
+            machines: mergeStreamSnapshotIntoMachines(
+              prev.machines,
+              parsed.machines!
+            ),
             virtualSensor: parsed.virtualSensor ?? prev.virtualSensor,
           }));
           setLastUpdated(
@@ -241,7 +261,10 @@ export function MachinesPageClient() {
       } catch {
         // abaikan event malformed
       }
-    });
+    };
+
+    es.addEventListener("snapshot", handleStreamSnapshot);
+    es.addEventListener("telemetry", handleStreamSnapshot);
 
     return () => {
       active = false;

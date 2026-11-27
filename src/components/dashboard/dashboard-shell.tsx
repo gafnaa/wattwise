@@ -19,6 +19,10 @@ import { Button } from "@/components/ui/button";
 import { KpiMetricCard } from "@/components/ui/wattwise-badges";
 import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
+  mergeStreamSnapshotIntoMachines,
+  type StreamMachineSnapshot,
+} from "@/lib/stream/merge-snapshot";
+import {
   formatRupiah,
   INITIAL_ACTION_LOGS,
   INITIAL_MACHINES,
@@ -94,6 +98,56 @@ export function DashboardShell() {
       cancelled = true;
     };
   }, [range]);
+
+  // Live SSE subscription untuk pembaruan daya, status mesin, & perangkat online real-time
+  React.useEffect(() => {
+    const es = new EventSource("/api/stream");
+    const handleSnapshot = (ev: Event) => {
+      try {
+        const parsed = JSON.parse((ev as MessageEvent).data) as {
+          machines?: StreamMachineSnapshot[];
+          virtualSensor?: DashboardOverviewResponse["virtualSensor"];
+          esp32OnlineCount?: number;
+          esp32TotalCount?: number;
+          timestamp?: string;
+        };
+        if (Array.isArray(parsed.machines) && parsed.machines.length > 0) {
+          setOverview((prev) => ({
+            ...prev,
+            workshop: {
+              ...prev.workshop,
+              esp32OnlineCount:
+                typeof parsed.esp32OnlineCount === "number"
+                  ? parsed.esp32OnlineCount
+                  : prev.workshop.esp32OnlineCount,
+              esp32TotalCount:
+                typeof parsed.esp32TotalCount === "number"
+                  ? parsed.esp32TotalCount
+                  : prev.workshop.esp32TotalCount,
+            },
+            machines: mergeStreamSnapshotIntoMachines(
+              prev.machines,
+              parsed.machines!
+            ),
+            virtualSensor: parsed.virtualSensor ?? prev.virtualSensor,
+          }));
+          setLastUpdatedLabel(
+            new Date(parsed.timestamp ?? Date.now()).toLocaleTimeString(
+              "id-ID",
+              { hour: "2-digit", minute: "2-digit", second: "2-digit" }
+            ) + " WIB"
+          );
+        }
+      } catch {
+        // abaikan snapshot malformed
+      }
+    };
+
+    es.addEventListener("snapshot", handleSnapshot);
+    return () => {
+      es.close();
+    };
+  }, []);
 
   function handleRangeChange(next: DateRangeKey) {
     setLoading(true);

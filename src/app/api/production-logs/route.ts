@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { calculateSpecificEnergyConsumption } from "@/lib/audit/calculator";
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { PERIOD_METRICS } from "@/lib/mock-dashboard-data";
 
@@ -113,6 +113,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth();
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = createProductionLogSchema.safeParse(rawBody);
 
@@ -133,8 +136,6 @@ export async function POST(request: Request) {
       { status: 400 }
     );
   }
-
-  const session = await getCurrentSession();
 
   try {
     const workshop = session?.workshopId

@@ -9,6 +9,10 @@ import {
   calculateWhatIfSavings,
   formatRupiah,
 } from "@/lib/mock-dashboard-data";
+import {
+  formatUnauthorizedTelegramMessage,
+  resolveAuthorizedTelegramWorkshop,
+} from "@/lib/telegram/auth";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
 
 const telegramUpdateSchema = z.object({
@@ -73,7 +77,43 @@ export async function POST(request: Request) {
     ? firstToken.split("@")[0]
     : "free_text";
 
-  const overview = await getDashboardOverview("month");
+  // Verifikasi otorisasi chat_id terhadap workshop terdaftar agar data bengkel
+  // & kuota Gemini AI tidak terbuka untuk pihak luar.
+  let workshops: Array<{
+    id: string;
+    name: string;
+    telegramChatId: string | null;
+  }> = [];
+  try {
+    workshops = await db.workshop.findMany({
+      select: { id: true, name: true, telegramChatId: true },
+      orderBy: { createdAt: "asc" },
+    });
+  } catch {
+    workshops = [];
+  }
+
+  const authDecision = resolveAuthorizedTelegramWorkshop({
+    incomingChatId: chatId,
+    workshops,
+    defaultChatId: process.env.TELEGRAM_DEFAULT_CHAT_ID,
+  });
+
+  if (!authDecision.authorized) {
+    const rejectMsg = formatUnauthorizedTelegramMessage(chatId);
+    await sendTelegramMessage({ chatId, text: rejectMsg }).catch(() => null);
+    return NextResponse.json({
+      ok: true,
+      authorized: false,
+      ignored: true,
+      command,
+    });
+  }
+
+  const overview = await getDashboardOverview(
+    "month",
+    authDecision.workshopId ?? undefined
+  );
   let replyText = "";
   let aiSource: "AI_LLM" | "AI_RULE" = "AI_RULE";
 
