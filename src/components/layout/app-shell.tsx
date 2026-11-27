@@ -12,7 +12,6 @@ import {
   ChevronsUpDown,
   Cpu,
   FileText,
-  Info,
   LayoutGrid,
   LogOut,
   Menu,
@@ -105,7 +104,6 @@ const RANGE_LABELS: Record<DateRangeKey, string> = {
 export function AppShell({
   title,
   section = "Menu Utama",
-  dataSource = "database",
   workshopName = "Area Produksi Furnitur",
   ownerName = "Pemilik Pabrik",
   ownerRole = "Pemilik",
@@ -226,34 +224,46 @@ export function AppShell({
         key={item.href}
         href={item.href}
         aria-label={collapsed ? item.label : undefined}
-        className={`relative flex items-center rounded-lg text-[13px] font-medium transition-colors ${
-          collapsed
-            ? "mx-auto size-10 justify-center p-0"
-            : "justify-between gap-2.5 px-2.5 py-2"
-        } ${
+        className={`group relative flex h-10 w-full items-center overflow-hidden rounded-lg px-4 text-[13px] font-medium transition-colors duration-200 ${
           active
             ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
             : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
         }`}
       >
-        <span className="flex min-w-0 items-center gap-2.5">
-          <Icon
-            className={`size-4 shrink-0 ${
-              active
-                ? "text-[#059669] dark:text-emerald-400"
-                : "text-zinc-500 dark:text-zinc-400"
-            }`}
-          />
-          {!collapsed && <span className="truncate">{item.label}</span>}
+        <Icon
+          className={`size-4 shrink-0 transition-transform duration-200 group-hover:scale-[1.06] ${
+            active
+              ? "text-[#059669] dark:text-emerald-400"
+              : "text-zinc-500 dark:text-zinc-400"
+          }`}
+        />
+        <span
+          className={`overflow-hidden truncate whitespace-nowrap transition-[opacity,max-width,margin,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+            collapsed
+              ? "ml-0 max-w-0 -translate-x-1.5 opacity-0"
+              : "ml-3 max-w-[155px] translate-x-0 opacity-100"
+          }`}
+        >
+          {item.label}
         </span>
 
-        {!collapsed && item.showBadge && effectivePending > 0 && (
-          <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#F5F3FF] px-1.5 text-[11.5px] font-semibold text-[#6D28D9] tabular-nums dark:bg-violet-950/70 dark:text-violet-300">
-            {effectivePending}
-          </span>
-        )}
-        {collapsed && item.showBadge && effectivePending > 0 && (
-          <span className="absolute top-1.5 right-1.5 size-2 rounded-full bg-[#6D28D9] ring-2 ring-sidebar" />
+        {item.showBadge && effectivePending > 0 && (
+          <>
+            <span
+              className={`ml-auto flex h-5 shrink-0 items-center justify-center overflow-hidden rounded-full bg-[#F5F3FF] text-[11.5px] font-semibold text-[#6D28D9] tabular-nums transition-[opacity,max-width,padding] duration-200 dark:bg-violet-950/70 dark:text-violet-300 ${
+                collapsed
+                  ? "max-w-0 px-0 opacity-0"
+                  : "min-w-5 max-w-[36px] px-1.5 opacity-100"
+              }`}
+            >
+              {effectivePending}
+            </span>
+            <span
+              className={`pointer-events-none absolute top-2 right-2.5 size-2 rounded-full bg-[#6D28D9] ring-2 ring-sidebar transition-[opacity,transform] duration-200 ${
+                collapsed ? "scale-100 opacity-100" : "scale-0 opacity-0"
+              }`}
+            />
+          </>
         )}
       </Link>
     );
@@ -275,213 +285,167 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Desktop Sidebar (256px expanded, 68px clean icon rail collapsed — zero overlap!) */}
+      {/* Desktop Sidebar — pixel-locked icon rail at x=34px for butter-smooth width animation */}
       <aside
-        className={`hidden shrink-0 border-r border-border bg-sidebar transition-[width] duration-200 ease-out lg:block ${
+        className={`hidden shrink-0 overflow-hidden border-r border-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] lg:block ${
           collapsed ? "w-[68px]" : "w-[256px]"
         }`}
       >
-        <div className="sticky top-0 flex h-screen flex-col">
-          {/* Brand Row: strictly separated collapsed vs expanded layout */}
-          <div
-            className={`flex h-16 shrink-0 items-center border-b border-border/60 ${
-              collapsed ? "justify-center px-2" : "justify-between gap-2 px-4"
-            }`}
-          >
+        <div className="sticky top-0 flex h-screen flex-col overflow-hidden">
+          {/* Brand Row — pure brand mark, toggle lives outside sidebar in top header */}
+          <div className="flex h-16 shrink-0 items-center border-b border-border/60 px-[18px]">
             <Link
               href="/dashboard"
-              className="flex min-w-0 items-center gap-2.5"
+              className="flex min-w-0 items-center"
               title="WattWise — Energy Intelligence"
             >
-              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#059669] text-white shadow-xs">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#059669] text-white shadow-xs transition-transform duration-200 hover:scale-[1.03]">
                 <Zap className="size-4 fill-white" />
               </div>
-              {!collapsed && (
-                <div className="min-w-0 leading-tight">
-                  <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
-                    WattWise
-                  </p>
-                  <p className="truncate text-[11.5px] text-muted-foreground">
-                    Energy Intelligence
-                  </p>
-                </div>
-              )}
-            </Link>
-
-            {!collapsed && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setCollapsed(true)}
-                className="size-8 shrink-0 text-muted-foreground hover:text-foreground"
-                aria-label="Sembunyikan sidebar"
-                title="Sembunyikan sidebar"
+              <div
+                className={`overflow-hidden leading-tight whitespace-nowrap transition-[opacity,max-width,margin,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  collapsed
+                    ? "ml-0 max-w-0 -translate-x-2 opacity-0"
+                    : "ml-2.5 max-w-[170px] translate-x-0 opacity-100"
+                }`}
               >
-                <PanelLeftClose className="size-4" />
-              </Button>
-            )}
+                <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                  WattWise
+                </p>
+                <p className="truncate text-[11.5px] text-muted-foreground">
+                  Energy Intelligence
+                </p>
+              </div>
+            </Link>
           </div>
 
           {/* Nav Groups */}
-          <nav
-            className={`flex-1 overflow-y-auto py-3 ${
-              collapsed ? "space-y-4 px-2" : "space-y-5 px-3"
-            }`}
-          >
+          <nav className="flex-1 space-y-4 overflow-x-hidden overflow-y-auto px-2.5 py-3">
             <div>
-              {!collapsed && (
-                <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  Menu Utama
-                </p>
-              )}
+              <p
+                className={`overflow-hidden px-3.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-muted-foreground uppercase transition-[opacity,max-height,margin] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  collapsed ? "mb-0 max-h-0 opacity-0" : "mb-1.5 max-h-5 opacity-100"
+                }`}
+              >
+                Menu Utama
+              </p>
               <div className="space-y-0.5">
                 {MAIN_NAV.map((item) => renderDesktopNavItem(item))}
               </div>
             </div>
 
-            <div className={collapsed ? "border-t border-border/60 pt-3" : ""}>
-              {!collapsed && (
-                <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  Manajemen
-                </p>
-              )}
+            <div className="border-t border-border/60 pt-3">
+              <p
+                className={`overflow-hidden px-3.5 text-[11px] font-semibold tracking-wider whitespace-nowrap text-muted-foreground uppercase transition-[opacity,max-height,margin] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  collapsed ? "mb-0 max-h-0 opacity-0" : "mb-1.5 max-h-5 opacity-100"
+                }`}
+              >
+                Manajemen
+              </p>
               <div className="space-y-0.5">
                 {MANAGEMENT_NAV.map((item) => renderDesktopNavItem(item))}
               </div>
             </div>
           </nav>
 
-          {/* Footer Stack */}
-          <div
-            className={`shrink-0 border-t border-border ${
-              collapsed ? "space-y-2 p-2" : "space-y-3 p-3"
-            }`}
-          >
-            {!collapsed && (
-              <div
-                className={
-                  dataSource === "demo"
-                    ? "rounded-xl border border-amber-200 bg-[#FFFBEB] p-3 text-xs dark:border-amber-900/60 dark:bg-amber-950/35"
-                    : "rounded-xl border border-emerald-200/80 bg-[#ECFDF5] p-3 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/35"
-                }
-              >
-                <div
-                  className={`flex items-center gap-1.5 font-semibold ${
-                    dataSource === "demo"
-                      ? "text-[#92400E] dark:text-amber-300"
-                      : "text-[#065F46] dark:text-emerald-300"
-                  }`}
-                >
-                  <Info className="size-3.5 shrink-0" />
-                  <span>
-                    {dataSource === "demo" ? "Mode Simulasi" : "Live Supabase"}
-                  </span>
-                </div>
-                <p
-                  className={`mt-1 text-xs leading-relaxed ${
-                    dataSource === "demo"
-                      ? "text-[#92400E]/85 dark:text-amber-200/80"
-                      : "text-[#065F46]/85 dark:text-emerald-200/80"
-                  }`}
-                >
-                  {dataSource === "demo"
-                    ? "Menampilkan baseline workshop pilot."
-                    : "Sensor, RF ISO 14955-5 & Gemini AI aktif."}
-                </p>
-              </div>
-            )}
-
+          {/* Footer Stack (clean: Theme Switcher + Profile Menu only) */}
+          <div className="shrink-0 space-y-2.5 border-t border-border px-2.5 py-3">
             {/* Theme Switcher */}
-            {collapsed ? (
-              <Tooltip>
-                <TooltipTrigger
-                  render={
-                    <button
-                      type="button"
-                      onClick={() =>
-                        setTheme(theme === "light" ? "dark" : "light")
-                      }
-                      className="mx-auto flex size-10 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
-                      aria-label="Ganti tema terang atau gelap"
-                    >
-                      {theme === "light" ? (
-                        <Moon className="size-4" />
-                      ) : (
-                        <Sun className="size-4" />
-                      )}
-                    </button>
-                  }
-                />
-                <TooltipContent side="right" className="text-xs">
-                  {theme === "light" ? "Mode Gelap" : "Mode Terang"}
-                </TooltipContent>
-              </Tooltip>
-            ) : (
-              <div className="grid grid-cols-2 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex h-8 items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${
-                    theme === "light"
-                      ? "bg-card text-foreground shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Sun className="size-3.5" />
-                  <span>Terang</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex h-8 items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${
-                    theme === "dark"
-                      ? "bg-card text-foreground shadow-2xs"
-                      : "text-muted-foreground hover:text-foreground"
-                  }`}
-                >
-                  <Moon className="size-3.5" />
-                  <span>Gelap</span>
-                </button>
-              </div>
-            )}
+            <div className="relative h-9">
+              {collapsed ? (
+                <Tooltip>
+                  <TooltipTrigger
+                    render={
+                      <button
+                        type="button"
+                        onClick={() =>
+                          setTheme(theme === "light" ? "dark" : "light")
+                        }
+                        className="mx-auto flex h-9 w-12 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+                        aria-label="Ganti tema terang atau gelap"
+                      >
+                        {theme === "light" ? (
+                          <Moon className="size-4" />
+                        ) : (
+                          <Sun className="size-4" />
+                        )}
+                      </button>
+                    }
+                  />
+                  <TooltipContent side="right" className="text-xs">
+                    {theme === "light" ? "Mode Gelap" : "Mode Terang"}
+                  </TooltipContent>
+                </Tooltip>
+              ) : (
+                <div className="grid h-9 grid-cols-2 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setTheme("light")}
+                    className={`flex items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors ${
+                      theme === "light"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Sun className="size-3.5 shrink-0" />
+                    <span>Terang</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setTheme("dark")}
+                    className={`flex items-center justify-center gap-1.5 rounded-md font-medium whitespace-nowrap transition-colors ${
+                      theme === "dark"
+                        ? "bg-card text-foreground shadow-2xs"
+                        : "text-muted-foreground hover:text-foreground"
+                    }`}
+                  >
+                    <Moon className="size-3.5 shrink-0" />
+                    <span>Gelap</span>
+                  </button>
+                </div>
+              )}
+            </div>
 
-            {/* Profile Menu */}
+            {/* Profile Menu — avatar locked at x=34px across collapse/expand */}
             <DropdownMenu>
               <DropdownMenuTrigger
                 render={
                   <button
                     type="button"
-                    className={`flex w-full items-center rounded-lg transition-colors hover:bg-muted ${
-                      collapsed
-                        ? "justify-center p-1"
-                        : "justify-between gap-2.5 p-1.5 text-left"
-                    }`}
+                    className="flex w-full items-center overflow-hidden rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-muted"
                     aria-label="Menu akun"
                   />
                 }
               >
-                <div className="flex min-w-0 items-center gap-2.5">
+                <div className="shrink-0">
                   <UserBlobatar
                     name={`wattwise-${effectiveUsername}`}
                     size={32}
                     shape="circle"
                     title={`${effectiveOwner} (${effectiveRole})`}
                   />
-                  {!collapsed && (
-                    <div className="min-w-0 leading-tight">
-                      <p className="truncate text-xs font-semibold text-foreground">
-                        {effectiveWorkshop}
-                      </p>
-                      <p className="truncate text-[11.5px] text-muted-foreground">
-                        {effectiveOwner} · {effectiveRole}
-                      </p>
-                    </div>
-                  )}
                 </div>
-                {!collapsed && (
-                  <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
-                )}
+                <div
+                  className={`min-w-0 flex-1 overflow-hidden leading-tight whitespace-nowrap transition-[opacity,max-width,margin,transform] duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                    collapsed
+                      ? "ml-0 max-w-0 -translate-x-1.5 opacity-0"
+                      : "ml-2.5 max-w-[155px] translate-x-0 opacity-100"
+                  }`}
+                >
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    {effectiveWorkshop}
+                  </p>
+                  <p className="truncate text-[11.5px] text-muted-foreground">
+                    {effectiveOwner} · {effectiveRole}
+                  </p>
+                </div>
+                <ChevronsUpDown
+                  className={`size-3.5 shrink-0 text-muted-foreground transition-[opacity,max-width,margin] duration-200 ${
+                    collapsed
+                      ? "ml-0 max-w-0 opacity-0"
+                      : "ml-1 max-w-[16px] opacity-100"
+                  }`}
+                />
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
                 <DropdownMenuGroup>
@@ -660,20 +624,47 @@ export function AppShell({
         {/* Compact Top Bar (Zero duplicate page heading!) */}
         <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/95 px-4 backdrop-blur-md sm:h-16 sm:px-6 lg:px-7">
           <div className="flex min-w-0 items-center gap-2.5">
-            {/* Desktop Expand Trigger — ONLY visible when rail is collapsed */}
-            {collapsed && (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setCollapsed(false)}
-                className="hidden size-8 shrink-0 text-muted-foreground hover:text-foreground lg:inline-flex"
-                aria-label="Tampilkan sidebar"
-                title="Tampilkan sidebar"
-              >
-                <PanelLeftOpen className="size-4" />
-              </Button>
-            )}
+            {/* Desktop Sidebar Toggle — ALWAYS outside sidebar card in one steady spot */}
+            <Tooltip>
+              <TooltipTrigger
+                render={
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setCollapsed((prev) => !prev)}
+                    aria-expanded={!collapsed}
+                    aria-label={
+                      collapsed ? "Tampilkan sidebar" : "Sembunyikan sidebar"
+                    }
+                    className="relative hidden size-8 shrink-0 rounded-lg border border-transparent text-muted-foreground transition-all duration-200 hover:border-border hover:bg-muted/70 hover:text-foreground active:scale-95 lg:inline-flex"
+                  >
+                    <PanelLeftClose
+                      className={`size-4 transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                        collapsed
+                          ? "scale-75 -rotate-90 opacity-0"
+                          : "scale-100 rotate-0 opacity-100"
+                      }`}
+                    />
+                    <PanelLeftOpen
+                      className={`absolute size-4 transition-all duration-250 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                        collapsed
+                          ? "scale-100 rotate-0 opacity-100"
+                          : "scale-75 rotate-90 opacity-0"
+                      }`}
+                    />
+                  </Button>
+                }
+              />
+              <TooltipContent side="bottom" className="text-xs">
+                {collapsed ? "Tampilkan sidebar" : "Sembunyikan sidebar"}
+              </TooltipContent>
+            </Tooltip>
+
+            <span
+              aria-hidden="true"
+              className="hidden h-4 w-px bg-border lg:block"
+            />
 
             {/* Mobile brand + drawer trigger */}
             <Button
