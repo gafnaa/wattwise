@@ -16,10 +16,7 @@ import { EnergyPerMachineCard } from "@/components/dashboard/energy-per-machine-
 import { MachineStatusDonutCard } from "@/components/dashboard/machine-status-donut-card";
 import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
-import {
-  DataSourceBadge,
-  KpiMetricCard,
-} from "@/components/ui/wattwise-badges";
+import { KpiMetricCard } from "@/components/ui/wattwise-badges";
 import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
   formatRupiah,
@@ -65,7 +62,7 @@ export function DashboardShell() {
     buildDefaultOverview("month")
   );
   const [loading, setLoading] = React.useState(true);
-  const [greeting, setGreeting] = React.useState("Selamat datang");
+  const [greeting, setGreeting] = React.useState("Ringkasan Energi");
   const [lastUpdatedLabel, setLastUpdatedLabel] = React.useState("Baru saja");
 
   React.useEffect(() => {
@@ -76,7 +73,7 @@ export function DashboardShell() {
       .then((data: DashboardOverviewResponse | null) => {
         if (!cancelled) {
           const now = new Date();
-          setGreeting(getGreetingFromDate(now));
+          setGreeting(`${getGreetingFromDate(now)}, Pemilik Pabrik`);
           if (data?.metrics) {
             setOverview(data);
             setLastUpdatedLabel(
@@ -146,136 +143,153 @@ export function DashboardShell() {
       range={range}
       onRangeChange={handleRangeChange}
     >
-      <div className="space-y-6">
-        {/* Greeting + Legend + Export Row */}
-        <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
-              {greeting}, Pemilik Pabrik
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Pemantauan {overview.machines.length} mesin prioritas di{" "}
-              {overview.workshop.name} · Data terakhir diterima{" "}
-              {lastUpdatedLabel}
+      <div className="space-y-6 sm:space-y-7">
+        {/* Single Authoritative Page Header */}
+        <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
+              {greeting}
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
+              {overview.machines.length} mesin prioritas di{" "}
+              {overview.workshop.name} · Pembaruan terakhir {lastUpdatedLabel}
             </p>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="hidden text-xs text-muted-foreground xl:inline">
-              Sumber data:
-            </span>
-            <DataSourceBadge kind="sensor" />
-            <DataSourceBadge kind="kalkulasi" />
-            <DataSourceBadge kind="prediksi-ml" />
-            <DataSourceBadge kind="rekomendasi-ai" />
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              onClick={handleExportCsv}
-              className="ml-1 h-8 gap-1.5 rounded-lg border-border bg-card text-xs font-medium"
-            >
-              <Download className="size-3.5" />
-              <span>Export</span>
-            </Button>
-          </div>
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={handleExportCsv}
+            className="h-9 gap-1.5 self-start rounded-lg border-border bg-card px-3.5 text-xs font-medium sm:self-auto"
+          >
+            <Download className="size-3.5" />
+            <span>Ekspor CSV</span>
+          </Button>
         </div>
 
-        {/* 6 KPI Cards (3x2 Grid — Exact Figma 01 · Ringkasan) */}
+        {/* Tier 1: 3 Primary Financial & Energy KPIs */}
         <Skeleton loading={loading}>
-          <section className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            <KpiMetricCard
-              icon={<Zap className="size-4" />}
-              iconTone="emerald"
-              title="Total Konsumsi Energi"
-              source="sensor"
-              value={overview.metrics.totalEnergyKwh.toLocaleString("id-ID", {
-                maximumFractionDigits: 1,
-              })}
-              unit="kWh"
-              trendLabel={`${overview.metrics.idleLossDeltaPct}%`}
-              trendDirection={
-                overview.metrics.idleLossDeltaPct <= 0 ? "down" : "up"
-              }
-              trendTone={
-                overview.metrics.idleLossDeltaPct <= 0 ? "positive" : "warning"
-              }
-              subtitle={`vs periode sebelumnya`}
-            />
+          <div className="space-y-4">
+            <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
+              <KpiMetricCard
+                icon={<Zap className="size-4" />}
+                iconTone="emerald"
+                title="Total Konsumsi Energi"
+                source="sensor"
+                value={overview.metrics.totalEnergyKwh.toLocaleString("id-ID", {
+                  maximumFractionDigits: 1,
+                })}
+                unit="kWh"
+                trendLabel={`${overview.metrics.idleLossDeltaPct}%`}
+                trendDirection={
+                  overview.metrics.idleLossDeltaPct <= 0 ? "down" : "up"
+                }
+                trendTone={
+                  overview.metrics.idleLossDeltaPct <= 0
+                    ? "positive"
+                    : "warning"
+                }
+                subtitle="vs periode sebelumnya"
+              />
 
-            <KpiMetricCard
-              icon={<Wallet className="size-4" />}
-              iconTone="zinc"
-              title="Estimasi Biaya Listrik"
-              source="kalkulasi"
-              value={formatRupiah(overview.metrics.totalEnergyCostIdr)}
-              trendLabel={`Efisiensi ${overview.metrics.operationalEfficiencyPct}%`}
-              trendDirection="down"
-              trendTone="positive"
-              subtitle={`tarif Rp ${overview.workshop.tariffIdrPerKwh.toLocaleString("id-ID")}/kWh`}
-            />
+              <KpiMetricCard
+                icon={<Wallet className="size-4" />}
+                iconTone="zinc"
+                title="Estimasi Biaya Listrik"
+                source="kalkulasi"
+                value={formatRupiah(overview.metrics.totalEnergyCostIdr)}
+                trendLabel={`ISO ${overview.metrics.operationalEfficiencyPct}%`}
+                trendDirection="down"
+                trendTone="positive"
+                subtitle={`Rp ${overview.workshop.tariffIdrPerKwh.toLocaleString("id-ID")}/kWh`}
+              />
 
-            <KpiMetricCard
-              icon={<PauseCircle className="size-4" />}
-              iconTone="amber"
-              title="Energi Saat Idle"
-              source="prediksi-ml"
-              value={idleKwh.toLocaleString("id-ID")}
-              unit="kWh"
-              trendLabel={`${idleSharePct}%`}
-              trendDirection="up"
-              trendTone="warning"
-              subtitle="dari total konsumsi"
-            />
+              <KpiMetricCard
+                icon={<Clock className="size-4" />}
+                iconTone="amber"
+                title="Estimasi Biaya Idle"
+                source="prediksi-ml"
+                value={formatRupiah(overview.metrics.idleLossIdr)}
+                trendLabel={`${idleSharePct}% energi`}
+                trendDirection="up"
+                trendTone="warning"
+                subtitle={`tertinggi: ${overview.metrics.topWasteMachine}`}
+              />
+            </section>
 
-            <KpiMetricCard
-              icon={<Clock className="size-4" />}
-              iconTone="amber"
-              title="Estimasi Biaya Idle"
-              source="kalkulasi"
-              value={formatRupiah(overview.metrics.idleLossIdr)}
-              trendLabel={overview.metrics.efficiencyBadge}
-              trendDirection="up"
-              trendTone="warning"
-              subtitle={`tertinggi: ${overview.metrics.topWasteMachine}`}
-            />
+            {/* Tier 2: Compact Hairline-Divided Live Operational Strip (breaks 6-identical-card monotony) */}
+            <section className="grid grid-cols-1 divide-y divide-border rounded-xl border border-border bg-card sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <PauseCircle className="size-3.5 text-[#D97706]" />
+                    <span>Energi Saat Idle</span>
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {idleSharePct}% dari total konsumsi periode ini
+                  </p>
+                </div>
+                <p className="shrink-0 font-mono text-lg font-semibold text-foreground tabular-nums">
+                  {idleKwh.toLocaleString("id-ID")}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    kWh
+                  </span>
+                </p>
+              </div>
 
-            <KpiMetricCard
-              icon={<PlayCircle className="size-4" />}
-              iconTone="emerald"
-              title="Mesin Aktif"
-              source="prediksi-ml"
-              value={activeMachinesCount}
-              unit={`/ ${overview.machines.length} mesin`}
-              subtitle={`${workingMachines.length} Working · ${startupMachines.length} Start-up`}
-            />
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <PlayCircle className="size-3.5 text-[#059669]" />
+                    <span>Mesin Aktif</span>
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {workingMachines.length} Working · {startupMachines.length}{" "}
+                    Start-up
+                  </p>
+                </div>
+                <p className="shrink-0 font-mono text-lg font-semibold text-foreground tabular-nums">
+                  {activeMachinesCount}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    /{overview.machines.length}
+                  </span>
+                </p>
+              </div>
 
-            <KpiMetricCard
-              icon={<PauseCircle className="size-4" />}
-              iconTone="amber"
-              title="Mesin dalam Kondisi Idle"
-              source="prediksi-ml"
-              value={idleMachines.length}
-              unit="mesin"
-              subtitle={
-                idleMachines.length > 0
-                  ? idleMachines.map((m) => m.name).join(", ")
-                  : "Semua mesin bekerja optimal atau mati"
-              }
-            />
-          </section>
+              <div className="flex items-center justify-between gap-3 px-5 py-3.5">
+                <div className="min-w-0">
+                  <p className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground">
+                    <PauseCircle className="size-3.5 text-[#D97706]" />
+                    <span>Sedang Idle</span>
+                  </p>
+                  <p className="mt-1 truncate text-xs text-muted-foreground">
+                    {idleMachines.length > 0
+                      ? idleMachines.map((m) => m.name).join(", ")
+                      : "Tidak ada mesin idle saat ini"}
+                  </p>
+                </div>
+                <p className="shrink-0 font-mono text-lg font-semibold text-foreground tabular-nums">
+                  {idleMachines.length}{" "}
+                  <span className="text-xs font-normal text-muted-foreground">
+                    mesin
+                  </span>
+                </p>
+              </div>
+            </section>
+          </div>
         </Skeleton>
 
-        {/* Row 2: Energy Consumption Chart (2fr) + Status Donut (1fr) */}
+        {/* Row 2: Energy Consumption Chart + Live Machine Status Donut */}
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="xl:col-span-8">
+          <div className="min-w-0 xl:col-span-8">
             <EnergyConsumptionCard
               machines={overview.machines}
               totalEnergyKwh={overview.metrics.totalEnergyKwh}
               tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
             />
           </div>
-          <div className="xl:col-span-4">
+          <div className="min-w-0 xl:col-span-4">
             <MachineStatusDonutCard
               machines={overview.machines}
               metrics={overview.metrics}
@@ -283,14 +297,18 @@ export function DashboardShell() {
           </div>
         </section>
 
-        {/* Row 3: Energy Per Machine (1fr) + AI Insight Card (1fr) */}
+        {/* Row 3: Energy Per Machine + AI Insight */}
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-2">
-          <EnergyPerMachineCard
-            machines={overview.machines}
-            tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
-            periodLabel={overview.metrics.label}
-          />
-          <AiInsightCard actionLogs={overview.actionLogs} />
+          <div className="min-w-0">
+            <EnergyPerMachineCard
+              machines={overview.machines}
+              tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
+              periodLabel={overview.metrics.label}
+            />
+          </div>
+          <div className="min-w-0">
+            <AiInsightCard actionLogs={overview.actionLogs} />
+          </div>
         </section>
       </div>
     </AppShell>

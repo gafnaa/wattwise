@@ -28,25 +28,25 @@ const DATA_SOURCE_META: Record<
     label: "Sensor",
     icon: Radio,
     className:
-      "bg-[#EFF6FF] text-[#1D4ED8] dark:bg-blue-950/60 dark:text-blue-300",
+      "bg-[#EFF6FF] text-[#1D4ED8] ring-1 ring-inset ring-blue-600/15 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-400/20",
   },
   kalkulasi: {
     label: "Kalkulasi",
     icon: Calculator,
     className:
-      "bg-[#F4F4F5] text-[#52525B] dark:bg-zinc-800 dark:text-zinc-300",
+      "bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10 dark:bg-zinc-800/80 dark:text-zinc-300 dark:ring-zinc-400/15",
   },
   "prediksi-ml": {
     label: "Prediksi ML",
     icon: Cpu,
     className:
-      "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/60 dark:text-emerald-300",
+      "bg-[#ECFDF5] text-[#047857] ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-400/20",
   },
   "rekomendasi-ai": {
     label: "Rekomendasi AI",
     icon: Sparkles,
     className:
-      "bg-[#F5F3FF] text-[#6D28D9] dark:bg-violet-950/60 dark:text-violet-300",
+      "bg-[#F5F3FF] text-[#6D28D9] ring-1 ring-inset ring-violet-600/15 dark:bg-violet-950/60 dark:text-violet-300 dark:ring-violet-400/20",
   },
 };
 
@@ -61,7 +61,7 @@ export function DataSourceBadge({
   const Icon = meta.icon;
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-medium leading-4 whitespace-nowrap ${meta.className} ${className}`}
+      className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11.5px] font-medium leading-4 whitespace-nowrap ${meta.className} ${className}`}
     >
       <Icon className="size-3 shrink-0" />
       <span>{meta.label}</span>
@@ -80,32 +80,32 @@ export type PillTone =
 
 const PILL_STYLES: Record<PillTone, { wrap: string; dot: string }> = {
   green: {
-    wrap: "bg-[#F0FDF4] text-[#15803D] dark:bg-green-950/60 dark:text-green-300",
+    wrap: "bg-[#F0FDF4] text-[#15803D] ring-1 ring-inset ring-green-600/15 dark:bg-green-950/60 dark:text-green-300 dark:ring-green-400/20",
     dot: "bg-[#16A34A]",
   },
   emerald: {
-    wrap: "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/60 dark:text-emerald-300",
+    wrap: "bg-[#ECFDF5] text-[#047857] ring-1 ring-inset ring-emerald-600/15 dark:bg-emerald-950/60 dark:text-emerald-300 dark:ring-emerald-400/20",
     dot: "bg-[#059669]",
   },
   amber: {
-    wrap: "bg-[#FFFBEB] text-[#B45309] dark:bg-amber-950/60 dark:text-amber-300",
+    wrap: "bg-[#FFFBEB] text-[#B45309] ring-1 ring-inset ring-amber-600/20 dark:bg-amber-950/60 dark:text-amber-300 dark:ring-amber-400/20",
     dot: "bg-[#D97706]",
   },
   red: {
-    wrap: "bg-[#FEF2F2] text-[#DC2626] dark:bg-red-950/60 dark:text-red-300",
+    wrap: "bg-[#FEF2F2] text-[#B91C1C] ring-1 ring-inset ring-red-600/15 dark:bg-red-950/60 dark:text-red-300 dark:ring-red-400/20",
     dot: "bg-[#DC2626]",
   },
   blue: {
-    wrap: "bg-[#EFF6FF] text-[#1D4ED8] dark:bg-blue-950/60 dark:text-blue-300",
+    wrap: "bg-[#EFF6FF] text-[#1D4ED8] ring-1 ring-inset ring-blue-600/15 dark:bg-blue-950/60 dark:text-blue-300 dark:ring-blue-400/20",
     dot: "bg-[#2563EB]",
   },
   violet: {
-    wrap: "bg-[#F5F3FF] text-[#6D28D9] dark:bg-violet-950/60 dark:text-violet-300",
+    wrap: "bg-[#F5F3FF] text-[#6D28D9] ring-1 ring-inset ring-violet-600/15 dark:bg-violet-950/60 dark:text-violet-300 dark:ring-violet-400/20",
     dot: "bg-[#7C3AED]",
   },
   gray: {
-    wrap: "bg-[#F4F4F5] text-[#52525B] dark:bg-zinc-800 dark:text-zinc-400",
-    dot: "bg-[#94A3B8]",
+    wrap: "bg-zinc-100 text-zinc-700 ring-1 ring-inset ring-zinc-600/10 dark:bg-zinc-800 dark:text-zinc-300 dark:ring-zinc-400/15",
+    dot: "bg-zinc-400",
   },
 };
 
@@ -121,7 +121,7 @@ export function StatusPill({
   const s = PILL_STYLES[tone];
   return (
     <span
-      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11.5px] font-medium leading-4 whitespace-nowrap ${s.wrap} ${className}`}
+      className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium leading-4 whitespace-nowrap ${s.wrap} ${className}`}
     >
       <span className={`size-1.5 shrink-0 rounded-full ${s.dot}`} />
       <span>{label}</span>
@@ -160,7 +160,7 @@ export function KpiMetricCard({
   icon: React.ReactNode;
   iconTone?: "emerald" | "zinc" | "amber";
   title: string;
-  source: DataSourceKind;
+  source?: DataSourceKind;
   value: React.ReactNode;
   unit?: string;
   trendLabel?: string;
@@ -168,31 +168,27 @@ export function KpiMetricCard({
   trendTone?: "positive" | "warning";
   subtitle?: string;
 }) {
-  const iconBg =
+  const iconColor =
     iconTone === "emerald"
-      ? "bg-[#ECFDF5] text-[#059669] dark:bg-emerald-950/60 dark:text-emerald-400"
+      ? "text-[#059669] dark:text-emerald-400"
       : iconTone === "amber"
-        ? "bg-[#FFFBEB] text-[#D97706] dark:bg-amber-950/60 dark:text-amber-400"
-        : "bg-[#F4F4F5] text-[#52525B] dark:bg-zinc-800 dark:text-zinc-300";
+        ? "text-[#D97706] dark:text-amber-400"
+        : "text-zinc-500 dark:text-zinc-400";
 
   return (
     <div className="flex flex-col justify-between rounded-xl border border-border bg-card p-5 transition-colors hover:border-zinc-300 dark:hover:border-zinc-700">
       <div className="flex items-center justify-between gap-2">
-        <div className="flex min-w-0 items-center gap-2.5">
-          <div
-            className={`flex size-8 shrink-0 items-center justify-center rounded-lg ${iconBg}`}
-          >
-            {icon}
-          </div>
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`shrink-0 ${iconColor}`}>{icon}</span>
           <span className="truncate text-[13px] font-medium text-muted-foreground">
             {title}
           </span>
         </div>
-        <DataSourceBadge kind={source} />
+        {source && <DataSourceBadge kind={source} />}
       </div>
 
-      <div className="mt-4 flex items-baseline gap-1.5">
-        <span className="text-[26px] font-semibold tracking-tight text-foreground tabular-nums">
+      <div className="mt-3.5 flex items-baseline gap-1.5">
+        <span className="text-[28px] leading-none font-semibold tracking-[-0.025em] text-foreground tabular-nums">
           {value}
         </span>
         {unit && (
@@ -203,10 +199,10 @@ export function KpiMetricCard({
       </div>
 
       {(trendLabel || subtitle) && (
-        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-xs">
+        <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
           {trendLabel && (
             <span
-              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11px] font-medium tabular-nums ${
+              className={`inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[11.5px] font-medium tabular-nums ${
                 trendTone === "positive"
                   ? "bg-[#F0FDF4] text-[#15803D] dark:bg-emerald-950/60 dark:text-emerald-300"
                   : "bg-[#FFFBEB] text-[#B45309] dark:bg-amber-950/60 dark:text-amber-300"

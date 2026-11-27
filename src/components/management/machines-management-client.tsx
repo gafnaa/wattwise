@@ -147,14 +147,14 @@ export function MachinesManagementClient() {
       dataSource={dataSource}
       workshopName={workshopName}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Header */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Manajemen Mesin
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               Kelola daftar mesin, daya terpasang, ambang idle, dan sensor yang
               terhubung
             </p>
@@ -174,12 +174,12 @@ export function MachinesManagementClient() {
           </Button>
         </div>
 
-        {/* Daftar Mesin Table Card — Exact Figma 06 · Manajemen Mesin */}
-        <section className="rounded-xl border border-border bg-card p-5">
+        {/* Daftar Mesin — Mobile Cards + Desktop Table */}
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
               Daftar Mesin
-            </h3>
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {machines.length} mesin terdaftar · total daya terpasang{" "}
               <span className="font-mono font-medium text-foreground">
@@ -188,70 +188,112 @@ export function MachinesManagementClient() {
             </p>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            {loading ? (
-              <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Memuat daftar mesin...
-              </div>
-            ) : (
-              <table className="w-full min-w-[600px] text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[11px] font-medium text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium">Mesin</th>
-                    <th className="pb-2.5 pr-4 font-medium">Status</th>
-                    <th className="pb-2.5 pr-4 font-medium">Daya terpasang</th>
-                    <th className="pb-2.5 pr-4 font-medium">Sensor</th>
-                    <th className="pb-2.5 pr-4 font-medium">Kuadran ISO</th>
-                    <th className="pb-2.5 text-right font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/70">
-                  {machines.map((m) => (
-                    <tr key={m.id}>
-                      <td className="py-3.5 pr-4">
-                        <p className="font-semibold text-foreground">
-                          {m.name}
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Memuat daftar mesin...
+            </div>
+          ) : (
+            <>
+              {/* Mobile Cards (<md) */}
+              <div className="mt-4 divide-y divide-border/70 md:hidden">
+                {machines.map((m) => (
+                  <div key={m.id} className="space-y-2 py-3.5 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
+                        <p className="font-semibold text-foreground">{m.name}</p>
+                        <p className="mt-0.5 text-xs text-muted-foreground">
+                          {m.code} · {QUADRANT_LABELS[m.portfolioQuadrant]}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
-                          {m.code} · {m.machineType} · Batas idle{" "}
-                          {m.idleAlertThresholdMin} mnt
-                        </p>
-                      </td>
-                      <td className="py-3.5 pr-4">
-                        <StatusPill
-                          label={m.isActive ? "Aktif" : "Perawatan"}
-                          tone={m.isActive ? "green" : "amber"}
-                        />
-                      </td>
-                      <td className="py-3.5 pr-4 font-mono font-medium text-foreground tabular-nums">
-                        {m.ratedPowerW.toLocaleString("id-ID")} W
-                      </td>
-                      <td className="py-3.5 pr-4 font-mono text-muted-foreground">
+                      </div>
+                      <StatusPill
+                        label={m.isActive ? "Aktif" : "Perawatan"}
+                        tone={m.isActive ? "green" : "amber"}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="font-mono text-muted-foreground">
+                        {m.ratedPowerW.toLocaleString("id-ID")} W ·{" "}
                         {m.deviceUid ??
-                          (m.hasPhysicalSensor ? "Belum dipasangkan" : "Virtual CT")}
-                      </td>
-                      <td className="py-3.5 pr-4 text-muted-foreground">
-                        {QUADRANT_LABELS[m.portfolioQuadrant]}
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setFormError(null);
-                            setEditing({ ...m });
-                          }}
-                          className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
-                        >
-                          Edit
-                        </button>
-                      </td>
+                          (m.hasPhysicalSensor ? "Tanpa sensor" : "Virtual CT")}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setFormError(null);
+                          setEditing({ ...m });
+                        }}
+                        className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
+                      >
+                        Edit
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (md+) */}
+              <div className="mt-5 hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                      <th className="pr-4 pb-2.5">Mesin</th>
+                      <th className="pr-4 pb-2.5">Status</th>
+                      <th className="pr-4 pb-2.5">Daya terpasang</th>
+                      <th className="pr-4 pb-2.5">Sensor</th>
+                      <th className="pr-4 pb-2.5">Kuadran ISO</th>
+                      <th className="pb-2.5 text-right">Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-border/70">
+                    {machines.map((m) => (
+                      <tr key={m.id}>
+                        <td className="py-3.5 pr-4">
+                          <p className="font-semibold text-foreground">
+                            {m.name}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {m.code} · {m.machineType} · Batas idle{" "}
+                            {m.idleAlertThresholdMin} mnt
+                          </p>
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <StatusPill
+                            label={m.isActive ? "Aktif" : "Perawatan"}
+                            tone={m.isActive ? "green" : "amber"}
+                          />
+                        </td>
+                        <td className="py-3.5 pr-4 font-mono font-medium text-foreground tabular-nums">
+                          {m.ratedPowerW.toLocaleString("id-ID")} W
+                        </td>
+                        <td className="py-3.5 pr-4 font-mono text-muted-foreground">
+                          {m.deviceUid ??
+                            (m.hasPhysicalSensor
+                              ? "Belum dipasangkan"
+                              : "Virtual CT")}
+                        </td>
+                        <td className="py-3.5 pr-4 text-muted-foreground">
+                          {QUADRANT_LABELS[m.portfolioQuadrant]}
+                        </td>
+                        <td className="py-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setFormError(null);
+                              setEditing({ ...m });
+                            }}
+                            className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
+                          >
+                            Edit
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </section>
       </div>
 

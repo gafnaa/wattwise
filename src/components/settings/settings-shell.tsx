@@ -151,14 +151,14 @@ export function SettingsShell() {
       dataSource={dataSource}
       workshopName={name}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Header */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Pengaturan
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               Profil usaha, tarif listrik PLN, notifikasi Telegram, dan
               integrasi sistem
             </p>
@@ -179,30 +179,32 @@ export function SettingsShell() {
           </Button>
         </div>
 
-        {/* Tabs Row + Last Saved — Exact Figma 08 · Pengaturan */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap rounded-lg border border-border bg-muted/50 p-0.5 text-xs">
-            {(
-              [
-                ["profil", "Profil & Tarif"],
-                ["notifikasi", "Notifikasi"],
-                ["pengguna", "Pengguna & Akses"],
-                ["integrasi", "Integrasi"],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setActiveTab(key)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                  activeTab === key
-                    ? "bg-card text-foreground shadow-2xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {/* Tabs Row (mobile horizontal scroll) + Last Saved */}
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto">
+            <div className="inline-flex shrink-0 rounded-lg border border-border bg-muted/50 p-0.5 text-xs">
+              {(
+                [
+                  ["profil", "Profil & Tarif"],
+                  ["notifikasi", "Notifikasi"],
+                  ["pengguna", "Pengguna & Akses"],
+                  ["integrasi", "Integrasi"],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setActiveTab(key)}
+                  className={`rounded-md px-3 py-1.5 font-medium whitespace-nowrap transition-colors ${
+                    activeTab === key
+                      ? "bg-card text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <p className="text-xs text-muted-foreground">{lastSavedText}</p>

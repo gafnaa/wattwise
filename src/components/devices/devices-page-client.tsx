@@ -180,14 +180,14 @@ export function DevicesPageClient() {
       onlineDevices={payload.onlineCount}
       totalDevices={payload.totalCount}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Header */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Perangkat IoT
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               {payload.totalCount} node ESP32 terdaftar · {payload.onlineCount}/
               {payload.totalCount} online · Heartbeat timeout{" "}
               {payload.heartbeatTimeoutSec} detik
@@ -209,7 +209,7 @@ export function DevicesPageClient() {
           </Button>
         </div>
 
-        {/* 3 KPI Cards — Exact Figma 07 · Perangkat IoT */}
+        {/* 3 KPI Cards */}
         <section className="grid grid-cols-1 gap-4 md:grid-cols-3">
           <KpiMetricCard
             icon={<Radio className="size-4" />}
@@ -252,89 +252,130 @@ export function DevicesPageClient() {
           />
         </section>
 
-        {/* Daftar Perangkat Table — Exact Figma 07 · Perangkat IoT */}
-        <section className="rounded-xl border border-border bg-card p-5">
+        {/* Daftar Perangkat — Mobile Cards + Desktop Table */}
+        <section className="rounded-xl border border-border bg-card p-4 sm:p-5">
           <div>
-            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
               Daftar Perangkat
-            </h3>
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Autentikasi aman via header{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 X-Device-UID
               </code>{" "}
-              &{" "}
-              <code className="rounded bg-muted px-1 py-0.5 font-mono text-[11px]">
+              &amp;{" "}
+              <code className="rounded bg-muted px-1 py-0.5 font-mono text-xs">
                 X-API-Key
               </code>{" "}
               (SHA-256)
             </p>
           </div>
 
-          <div className="mt-5 overflow-x-auto">
-            {loading ? (
-              <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
-                <Loader2 className="mr-2 size-4 animate-spin" />
-                Memuat perangkat IoT...
-              </div>
-            ) : (
-              <table className="w-full min-w-[600px] text-left text-xs">
-                <thead>
-                  <tr className="border-b border-border text-[11px] font-medium text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium">Perangkat</th>
-                    <th className="pb-2.5 pr-4 font-medium">Status</th>
-                    <th className="pb-2.5 pr-4 font-medium">Mesin terhubung</th>
-                    <th className="pb-2.5 pr-4 font-medium">
-                      Sinkron terakhir
-                    </th>
-                    <th className="pb-2.5 text-right font-medium">Aksi</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-border/70">
-                  {payload.devices.map((dev) => (
-                    <tr key={dev.id}>
-                      <td className="py-3.5 pr-4">
+          {loading ? (
+            <div className="flex items-center justify-center py-12 text-xs text-muted-foreground">
+              <Loader2 className="mr-2 size-4 animate-spin" />
+              Memuat perangkat IoT...
+            </div>
+          ) : (
+            <>
+              {/* Mobile Cards (<md) */}
+              <div className="mt-4 divide-y divide-border/70 md:hidden">
+                {payload.devices.map((dev) => (
+                  <div key={dev.id} className="space-y-2 py-3.5 text-xs">
+                    <div className="flex items-start justify-between gap-2">
+                      <div className="min-w-0">
                         <p className="font-mono font-semibold text-foreground">
                           {dev.deviceUid}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {dev.isMainMeter
-                            ? "Meter Induk PLN (Virtual CT Ref)"
-                            : "Sensor Arus / PZEM-004T"}{" "}
-                          · firmware {dev.firmwareVersion}
+                            ? "Meter Induk Workshop"
+                            : dev.machine?.name ?? "Belum dipasangkan"}
                         </p>
-                      </td>
-                      <td className="py-3.5 pr-4">
-                        <StatusPill
-                          label={dev.status === "ONLINE" ? "Online" : "Offline"}
-                          tone={dev.status === "ONLINE" ? "green" : "amber"}
-                        />
-                      </td>
-                      <td className="py-3.5 pr-4 font-medium text-foreground">
-                        {dev.isMainMeter
-                          ? "Meter Induk Workshop"
-                          : dev.machine?.name ?? "Belum dipasangkan"}
-                      </td>
-                      <td className="py-3.5 pr-4 font-mono text-muted-foreground">
+                      </div>
+                      <StatusPill
+                        label={dev.status === "ONLINE" ? "Online" : "Offline"}
+                        tone={dev.status === "ONLINE" ? "green" : "amber"}
+                      />
+                    </div>
+                    <div className="flex items-center justify-between pt-1">
+                      <span className="font-mono text-muted-foreground">
+                        fw {dev.firmwareVersion} ·{" "}
                         {formatLastSeen(dev.secondsSinceLastSeen)}
-                      </td>
-                      <td className="py-3.5 text-right">
-                        <button
-                          type="button"
-                          onClick={() => handleDeleteDevice(dev.deviceUid)}
-                          className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[#DC2626]"
-                          title="Hapus perangkat"
-                        >
-                          <Trash2 className="size-3.5" />
-                          <span>Hapus</span>
-                        </button>
-                      </td>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleDeleteDevice(dev.deviceUid)}
+                        className="inline-flex items-center gap-1 font-medium text-muted-foreground hover:text-[#DC2626]"
+                      >
+                        <Trash2 className="size-3.5" />
+                        <span>Hapus</span>
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Desktop Table (md+) */}
+              <div className="mt-5 hidden overflow-x-auto md:block">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                      <th className="pr-4 pb-2.5">Perangkat</th>
+                      <th className="pr-4 pb-2.5">Status</th>
+                      <th className="pr-4 pb-2.5">Mesin terhubung</th>
+                      <th className="pr-4 pb-2.5">Sinkron terakhir</th>
+                      <th className="pb-2.5 text-right">Aksi</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </div>
+                  </thead>
+                  <tbody className="divide-y divide-border/70">
+                    {payload.devices.map((dev) => (
+                      <tr key={dev.id}>
+                        <td className="py-3.5 pr-4">
+                          <p className="font-mono font-semibold text-foreground">
+                            {dev.deviceUid}
+                          </p>
+                          <p className="mt-0.5 text-xs text-muted-foreground">
+                            {dev.isMainMeter
+                              ? "Meter Induk PLN (Virtual CT Ref)"
+                              : "Sensor Arus / PZEM-004T"}{" "}
+                            · firmware {dev.firmwareVersion}
+                          </p>
+                        </td>
+                        <td className="py-3.5 pr-4">
+                          <StatusPill
+                            label={
+                              dev.status === "ONLINE" ? "Online" : "Offline"
+                            }
+                            tone={dev.status === "ONLINE" ? "green" : "amber"}
+                          />
+                        </td>
+                        <td className="py-3.5 pr-4 font-medium text-foreground">
+                          {dev.isMainMeter
+                            ? "Meter Induk Workshop"
+                            : dev.machine?.name ?? "Belum dipasangkan"}
+                        </td>
+                        <td className="py-3.5 pr-4 font-mono text-muted-foreground">
+                          {formatLastSeen(dev.secondsSinceLastSeen)}
+                        </td>
+                        <td className="py-3.5 text-right">
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteDevice(dev.deviceUid)}
+                            className="inline-flex items-center gap-1 text-xs font-medium text-muted-foreground hover:text-[#DC2626]"
+                            title="Hapus perangkat"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Hapus</span>
+                          </button>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </>
+          )}
         </section>
       </div>
 

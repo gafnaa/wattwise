@@ -243,26 +243,26 @@ export function MachinesPageClient() {
       onlineDevices={overview.workshop.esp32OnlineCount}
       totalDevices={overview.workshop.esp32TotalCount}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Title & Action Buttons */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Monitoring Mesin
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               {overview.machines.length} mesin di {overview.workshop.name} ·
-              Diperbarui real-time via SSE · Terakhir {lastUpdated}
+              Real-time SSE · Terakhir {lastUpdated}
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button
               type="button"
               variant="outline"
               size="sm"
               disabled={tickBusy}
               onClick={handleSimulateTick}
-              className="h-8 gap-1.5 rounded-lg border-border bg-card text-xs font-medium"
+              className="h-9 gap-1.5 rounded-lg border-border bg-card px-3 text-xs font-medium"
             >
               {tickBusy ? (
                 <RefreshCw className="size-3.5 animate-spin" />
@@ -276,47 +276,49 @@ export function MachinesPageClient() {
               variant="outline"
               size="sm"
               onClick={handleExportCsv}
-              className="h-8 gap-1.5 rounded-lg border-border bg-card text-xs font-medium"
+              className="h-9 gap-1.5 rounded-lg border-border bg-card px-3 text-xs font-medium"
             >
               <Download className="size-3.5" />
-              <span>Export</span>
+              <span>Ekspor CSV</span>
             </Button>
           </div>
         </div>
 
-        {/* Filter Bar + Total Load Summary */}
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="inline-flex flex-wrap items-center rounded-lg border border-border bg-muted/50 p-0.5 text-xs">
-            {(
-              [
-                ["ALL", `Semua · ${counts.ALL}`],
-                ["WORKING", `Working · ${counts.WORKING}`],
-                ["IDLE", `Idle · ${counts.IDLE}`],
-                ["START_UP", `Start-up · ${counts.START_UP}`],
-                ["OFF", `Off · ${counts.OFF}`],
-              ] as const
-            ).map(([key, label]) => (
-              <button
-                key={key}
-                type="button"
-                onClick={() => setFilterStatus(key)}
-                className={`rounded-md px-3 py-1.5 font-medium transition-colors ${
-                  filterStatus === key
-                    ? "bg-card text-foreground shadow-2xs"
-                    : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                {label}
-              </button>
-            ))}
+        {/* Filter Bar (horizontal scroll on mobile) + Total Load Summary */}
+        <div className="flex flex-col justify-between gap-3 md:flex-row md:items-center">
+          <div className="no-scrollbar flex max-w-full overflow-x-auto">
+            <div className="inline-flex shrink-0 items-center rounded-lg border border-border bg-muted/50 p-0.5 text-xs">
+              {(
+                [
+                  ["ALL", `Semua · ${counts.ALL}`],
+                  ["WORKING", `Working · ${counts.WORKING}`],
+                  ["IDLE", `Idle · ${counts.IDLE}`],
+                  ["START_UP", `Start-up · ${counts.START_UP}`],
+                  ["OFF", `Off · ${counts.OFF}`],
+                ] as const
+              ).map(([key, label]) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setFilterStatus(key)}
+                  className={`rounded-md px-3 py-1.5 font-medium whitespace-nowrap transition-colors ${
+                    filterStatus === key
+                      ? "bg-card text-foreground shadow-2xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           <p className="text-xs text-muted-foreground">
-            Total beban saat ini:{" "}
+            Beban aktif:{" "}
             <span className="font-mono font-semibold text-foreground">
               {totalCurrentW.toLocaleString("id-ID")} W
             </span>{" "}
-            dari{" "}
+            /{" "}
             <span className="font-mono font-medium text-foreground">
               {totalRatedW.toLocaleString("id-ID")} W
             </span>{" "}
@@ -419,7 +421,7 @@ export function MachinesPageClient() {
 
         {/* Bottom 2-Col: Log Kejadian Hari Ini + Konsumsi Energi Chart */}
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="rounded-xl border border-border bg-card p-5 xl:col-span-4">
+          <div className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 xl:col-span-4">
             <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
               Log Kejadian Hari Ini
             </h3>
@@ -453,7 +455,7 @@ export function MachinesPageClient() {
             </div>
           </div>
 
-          <div className="xl:col-span-8">
+          <div className="min-w-0 xl:col-span-8">
             <EnergyConsumptionCard
               machines={overview.machines}
               totalEnergyKwh={overview.metrics.totalEnergyKwh}
