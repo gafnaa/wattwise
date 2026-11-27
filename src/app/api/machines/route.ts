@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { classifyEnergyPortfolioQuadrant } from "@/lib/audit/portfolio";
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, requireApiAuth } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard/service";
 import { db } from "@/lib/db";
 
@@ -60,6 +60,11 @@ const createMachineSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = createMachineSchema.safeParse(rawBody);
 
@@ -84,8 +89,6 @@ export async function POST(request: Request) {
     parsed.data.baselineIdleW ?? Math.round(parsed.data.ratedPowerW * 0.32);
   const baselineWorkingW =
     parsed.data.baselineWorkingW ?? Math.round(parsed.data.ratedPowerW * 0.8);
-
-  const session = await getCurrentSession();
 
   try {
     const workshop = session?.workshopId

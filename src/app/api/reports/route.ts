@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { formatTelegramSummaryReport } from "@/lib/audit/recommendations";
-import { getCurrentSession } from "@/lib/auth";
+import { getCurrentSession, requireApiAuth } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard/service";
 import { db } from "@/lib/db";
 import {
@@ -105,6 +105,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth();
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = createReportSchema.safeParse(rawBody);
 
@@ -120,7 +123,6 @@ export async function POST(request: Request) {
 
   const { range, format } = parsed.data;
   const scope = parsed.data.scope.toUpperCase();
-  const session = await getCurrentSession();
   const overview = await getDashboardOverview(range, session?.workshopId);
 
   const filteredMachines =
@@ -291,6 +293,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const { searchParams } = new URL(request.url);
   const id = searchParams.get("id")?.trim();
   if (!id) {
@@ -299,8 +306,6 @@ export async function DELETE(request: Request) {
       { status: 400 }
     );
   }
-
-  const session = await getCurrentSession();
 
   try {
     const workshop = session?.workshopId

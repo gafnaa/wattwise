@@ -6,7 +6,7 @@ import {
   generateMachineRecommendations,
   type MachineAuditStats,
 } from "@/lib/audit/recommendations";
-import { getCurrentSession } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { INITIAL_MACHINES } from "@/lib/mock-dashboard-data";
 
@@ -17,7 +17,9 @@ import { INITIAL_MACHINES } from "@/lib/mock-dashboard-data";
  * 3) Generative AI Advisor (saran operasional kontekstual + fallback otomatis ke rule-based)
  */
 export async function POST(request: Request) {
-  const session = await getCurrentSession();
+  const { session, response: authError } = await requireApiAuth();
+  if (authError) return authError;
+
   const since = new Date(Date.now() - 30 * 86_400_000);
   const rawBody = (await request.json().catch(() => ({}))) as {
     replacePending?: boolean;

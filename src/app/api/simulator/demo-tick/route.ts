@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { z } from "zod";
 import { calculateEnergyKwhFromPower } from "@/lib/audit/calculator";
 import { calculateVirtualSensorPower } from "@/lib/audit/virtual-sensor";
-import { getCurrentSession } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { classifyTelemetryWindow } from "@/lib/ml/classifier";
 import type { PowerSample } from "@/lib/ml/types";
@@ -53,6 +53,9 @@ function generateScenarioPowerWindow(
  * pengujian end-to-end dan demo Hackathon tanpa hardware tersambung penuh).
  */
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth();
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => ({}));
   const parsed = demoTickSchema.safeParse(rawBody);
   const scenario = parsed.success ? (parsed.data?.scenario ?? "normal") : "normal";
@@ -60,7 +63,6 @@ export async function POST(request: Request) {
 
   const now = new Date();
   const nowMs = now.getTime();
-  const session = await getCurrentSession();
 
   const pickMode = (
     code: string,

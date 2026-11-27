@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
 import { formatTelegramSummaryReport } from "@/lib/audit/recommendations";
-import { getCurrentSession } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/auth";
 import { getDashboardOverview } from "@/lib/dashboard/service";
 import { db } from "@/lib/db";
 import { sendTelegramMessage } from "@/lib/telegram/bot";
@@ -15,6 +15,9 @@ const sendReportSchema = z.object({
 });
 
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth();
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = sendReportSchema.safeParse(rawBody);
 
@@ -25,7 +28,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const session = await getCurrentSession();
   const overview = await getDashboardOverview("month", session?.workshopId);
 
   const sorted = [...overview.machines].sort(

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
-import { getCurrentSession } from "@/lib/auth";
+import { requireApiAuth } from "@/lib/auth";
 import { db } from "@/lib/db";
 import { generateDeviceApiKey } from "@/lib/iot/device-utils";
 
@@ -21,6 +21,11 @@ const registerDeviceSchema = z.object({
  * untuk di-flash ke firmware (di database hanya disimpan hash SHA-256).
  */
 export async function POST(request: Request) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const rawBody = await request.json().catch(() => null);
   const parsed = registerDeviceSchema.safeParse(rawBody);
 
@@ -34,7 +39,6 @@ export async function POST(request: Request) {
     );
   }
 
-  const session = await getCurrentSession();
   const { rawKey, apiKeyHash } = generateDeviceApiKey();
 
   try {
@@ -99,6 +103,11 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+  const { session, response: authError } = await requireApiAuth({
+    roles: ["OWNER", "ADMIN"],
+  });
+  if (authError) return authError;
+
   const { searchParams } = new URL(request.url);
   const deviceUid = searchParams.get("deviceUid")?.trim();
 
@@ -110,7 +119,26 @@ export async function DELETE(request: Request) {
   }
 
   try {
-    await db.device.delete({ where: { deviceUid } });
+    const workshop = session?.workshopId
+      ? await db.workshop.findUnique({ where: { id: session.workshopId } })
+      : await db.workshop.findFirst({ orderBy: { createdAt: "asc" } });
+
+    if (!workshop) {
+      return NextResponse.json(
+        { error: "Workshop tidak ditemukan." },
+        { status: 404 }
+      );
+    }
+
+    const deleted = await db.device.deleteMany({
+      where: { deviceUid, workshopId: workshop.id },
+    });
+    if (deleted.count === 0) {
+      return NextResponse.json(
+        { error: `Device '${deviceUid}' tidak ditemukan pada workshop ini.` },
+        { status: 404 }
+      );
+    }
     return NextResponse.json({ ok: true, deletedDeviceUid: deviceUid });
   } catch {
     return NextResponse.json(
