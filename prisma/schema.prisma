@@ -66,6 +66,23 @@ enum DeliveryStatus {
   FAILED
 }
 
+enum ReportFormat {
+  PDF
+  CSV
+  TELEGRAM
+}
+
+enum ReportSource {
+  MANUAL
+  AUTOMATIC
+}
+
+enum ReportStatus {
+  READY
+  SENT
+  FAILED
+}
+
 // =============================================================================
 // Models
 // =============================================================================
@@ -87,6 +104,7 @@ model Workshop {
   productionLogs        ProductionLog[]
   actionRecommendations ActionRecommendation[]
   telegramNotifications TelegramNotification[]
+  auditReports          AuditReport[]
 
   @@map("workshops")
 }
@@ -251,4 +269,27 @@ model TelegramNotification {
   @@index([workshopId, sentAt(sort: Desc)])
   @@index([machineId, notificationType, sentAt(sort: Desc)])
   @@map("telegram_notifications")
+}
+
+model AuditReport {
+  id             String       @id @default(uuid())
+  workshopId     String       @map("workshop_id")
+  title          String
+  periodRange    String       @map("period_range")
+  machineScope   String       @default("ALL") @map("machine_scope")
+  format         ReportFormat @default(PDF)
+  source         ReportSource @default(MANUAL)
+  status         ReportStatus @default(READY)
+  totalEnergyKwh Float        @map("total_energy_kwh")
+  totalCostIdr   Decimal      @map("total_cost_idr") @db.Decimal(12, 2)
+  idleLossIdr    Decimal      @map("idle_loss_idr") @db.Decimal(12, 2)
+  efficiencyPct  Float        @map("efficiency_pct")
+  machineCount   Int          @map("machine_count")
+  createdBy      String?      @map("created_by")
+  createdAt      DateTime     @default(now()) @map("created_at")
+
+  workshop Workshop @relation(fields: [workshopId], references: [id], onDelete: Cascade)
+
+  @@index([workshopId, createdAt(sort: Desc)])
+  @@map("audit_reports")
 }
