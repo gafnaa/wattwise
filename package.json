@@ -2,12 +2,15 @@
   "name": "wattwise",
   "version": "0.1.0",
   "private": true,
+  "engines": {
+    "node": ">=20.9.0"
+  },
   "scripts": {
     "dev": "next dev",
     "dev:webpack": "next dev --webpack",
     "build": "next build",
     "build:webpack": "next build --webpack",
-    "start": "next start",
+    "start": "next start -H 0.0.0.0 -p ${PORT:-3000}",
     "lint": "eslint",
     "test": "tsx --test src/lib/__tests__/*.test.ts",
     "ml:train": "tsx ml/train-baseline.ts",

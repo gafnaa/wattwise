@@ -4,6 +4,7 @@ import {
   integrateTimeSeriesEnergyKwh,
 } from "@/lib/audit/calculator";
 import { db } from "@/lib/db";
+import { MAX_SESSION_GAP_SEC } from "@/lib/iot/ingestion";
 import { INITIAL_MACHINES, WORKSHOP_INFO } from "@/lib/mock-dashboard-data";
 
 export async function GET(
@@ -65,7 +66,8 @@ export async function GET(
         sampleIndex: r.sampleIndex,
         recordedAt: r.recordedAt,
         powerW: r.powerW,
-      }))
+      })),
+      MAX_SESSION_GAP_SEC
     );
 
     const idleSec = sessions
@@ -101,6 +103,8 @@ export async function GET(
         powerW: r.powerW,
         voltageV: r.voltageV,
         currentA: r.currentA,
+        energyKwh: r.energyKwh,
+        cumulativeEnergyKwh: r.cumulativeEnergyKwh,
         powerFactor: r.powerFactor,
         predictedStatus: r.predictedStatus,
         statusConfidence: r.statusConfidence,

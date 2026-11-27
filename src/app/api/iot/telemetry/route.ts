@@ -1,15 +1,17 @@
 import { NextResponse } from "next/server";
-import { hashDeviceApiKey, timingSafeEqualHex } from "@/lib/auth";
-import {
-  calculateCostIdr,
-  calculateEnergyKwhFromPower,
-} from "@/lib/audit/calculator";
+import { calculateCostIdr } from "@/lib/audit/calculator";
 import {
   formatTelegramUrgentAlert,
   shouldTriggerUrgentIdleAlert,
 } from "@/lib/audit/recommendations";
 import { calculateVirtualSensorPower } from "@/lib/audit/virtual-sensor";
+import { hashDeviceApiKey, timingSafeEqualHex } from "@/lib/auth";
 import { db } from "@/lib/db";
+import {
+  computeIntervalAccounting,
+  isPrismaUniqueConstraintError,
+  normalizeAndDedupeTelemetryBatch,
+} from "@/lib/iot/ingestion";
 import { telemetryBodySchema } from "@/lib/iot/telemetry-schema";
 import { classifyTelemetryWindow } from "@/lib/ml/classifier";
 import type { HysteresisState, PowerSample } from "@/lib/ml/types";
@@ -30,13 +32,13 @@ export async function POST(request: Request) {
       );
     }
 
-    const items =
+    const rawItems =
       "readings" in parsed.data ? parsed.data.readings : [parsed.data];
 
     const deviceUid =
       request.headers.get("x-device-uid") ??
       ("device_uid" in parsed.data ? parsed.data.device_uid : undefined) ??
-      items[0]?.device_uid;
+      rawItems[0]?.device_uid;
     const rawApiKey = request.headers.get("x-api-key");
 
     if (!deviceUid || !rawApiKey) {
@@ -75,18 +77,32 @@ export async function POST(request: Request) {
     const now = new Date();
     const tariffIdr = Number(device.workshop.tariffIdrPerKwh);
 
+    const { items, intraBatchDuplicates } = normalizeAndDedupeTelemetryBatch(
+      rawItems,
+      now.getTime()
+    );
+
     // Update heartbeat ESP32
     await db.device.update({
       where: { id: device.id },
       data: {
         lastSeenAt: now,
-        firmwareVersion: items[0]?.firmware_version ?? device.firmwareVersion,
+        firmwareVersion:
+          items[0]?.firmwareVersion ??
+          rawItems[0]?.firmware_version ??
+          device.firmwareVersion,
       },
     });
+
+    let skippedDuplicates = intraBatchDuplicates;
+    let skippedOutOfOrder = 0;
 
     const processedResults: Array<{
       recordedAt: string;
       powerW: number;
+      deltaKwh?: number;
+      accountingDtSec?: number;
+      energySource?: string;
       status: string;
       confidence: number;
       virtualPowerW?: number;
@@ -94,38 +110,67 @@ export async function POST(request: Request) {
     }> = [];
 
     for (const item of items) {
-      const powerW = item.metrics?.power_w ?? item.power_w ?? item.daya;
-      if (typeof powerW !== "number") {
+      const {
+        recordedAt,
+        sampleIndex,
+        powerW,
+        voltageV,
+        currentA,
+        cumulativeEnergyKwh,
+        frequencyHz,
+        powerFactor,
+        isSimulated,
+      } = item;
+
+      // Cek deduplikasi tingkat database per (deviceId, recordedAt)
+      const existingSameTimestamp = await db.telemetryReading.findUnique({
+        where: {
+          deviceId_recordedAt: {
+            deviceId: device.id,
+            recordedAt,
+          },
+        },
+        select: { id: true },
+      });
+
+      if (existingSameTimestamp) {
+        skippedDuplicates++;
         continue;
       }
 
-      const tsInput = item.recorded_at ?? item.timestamp;
-      const recordedAt = tsInput ? new Date(tsInput) : new Date();
-      const sampleIndex = item.sample_index ?? item.index ?? null;
-
       // Jalur 1: Node Meter Induk PLN -> hitung Virtual Sensor agregat
       if (device.isMainMeter) {
-        const [virtualMachine, priorityMachines] = await Promise.all([
-          db.machine.findFirst({
-            where: {
-              workshopId: device.workshopId,
-              hasPhysicalSensor: false,
-            },
-          }),
-          db.machine.findMany({
-            where: {
-              workshopId: device.workshopId,
-              hasPhysicalSensor: true,
-              isActive: true,
-            },
-            include: {
-              telemetryReadings: {
-                orderBy: { recordedAt: "desc" },
-                take: 1,
+        const [virtualMachine, priorityMachines, prevMainReading] =
+          await Promise.all([
+            db.machine.findFirst({
+              where: {
+                workshopId: device.workshopId,
+                hasPhysicalSensor: false,
               },
-            },
-          }),
-        ]);
+            }),
+            db.machine.findMany({
+              where: {
+                workshopId: device.workshopId,
+                hasPhysicalSensor: true,
+                isActive: true,
+              },
+              include: {
+                telemetryReadings: {
+                  orderBy: { recordedAt: "desc" },
+                  take: 1,
+                },
+              },
+            }),
+            db.telemetryReading.findFirst({
+              where: { deviceId: device.id },
+              orderBy: { recordedAt: "desc" },
+              select: {
+                recordedAt: true,
+                powerW: true,
+                cumulativeEnergyKwh: true,
+              },
+            }),
+          ]);
 
         const prioritySnapshots = priorityMachines
           .filter((m) => m.telemetryReadings[0])
@@ -142,30 +187,59 @@ export async function POST(request: Request) {
           priorityReadings: prioritySnapshots,
         });
 
+        const mainAccounting = computeIntervalAccounting({
+          prevReading: prevMainReading,
+          currRecordedAt: recordedAt,
+          currPowerW: vs.virtualPowerW,
+          currCumulativeEnergyKwh: null, // Virtual load dihitung dari daya selisih
+          ratedPowerW: Math.max(virtualMachine?.ratedPowerW ?? 2000, 2000),
+        });
+
+        if (mainAccounting.shouldSkip) {
+          if (mainAccounting.kind === "OUT_OF_ORDER") {
+            skippedOutOfOrder++;
+          } else {
+            skippedDuplicates++;
+          }
+          continue;
+        }
+
         if (virtualMachine) {
           const virtualStatus = vs.virtualPowerW < 25 ? "OFF" : "WORKING";
-          await db.telemetryReading.create({
-            data: {
-              deviceId: device.id,
-              machineId: virtualMachine.id,
-              sampleIndex,
-              recordedAt,
-              powerW: vs.virtualPowerW,
-              voltageV: item.metrics?.voltage_v ?? null,
-              currentA: item.metrics?.current_a ?? null,
-              energyKwh: item.metrics?.energy_kwh ?? null,
-              frequencyHz: item.metrics?.frequency_hz ?? null,
-              powerFactor: item.metrics?.power_factor ?? null,
-              predictedStatus: virtualStatus,
-              statusConfidence: 1.0,
-              isSimulated: Boolean(item.is_simulated),
-            },
-          });
+          try {
+            await db.telemetryReading.create({
+              data: {
+                deviceId: device.id,
+                machineId: virtualMachine.id,
+                sampleIndex,
+                recordedAt,
+                powerW: vs.virtualPowerW,
+                voltageV,
+                currentA,
+                energyKwh: mainAccounting.deltaKwh,
+                cumulativeEnergyKwh,
+                frequencyHz,
+                powerFactor,
+                predictedStatus: virtualStatus,
+                statusConfidence: 1.0,
+                isSimulated,
+              },
+            });
+          } catch (err) {
+            if (isPrismaUniqueConstraintError(err)) {
+              skippedDuplicates++;
+              continue;
+            }
+            throw err;
+          }
         }
 
         processedResults.push({
           recordedAt: recordedAt.toISOString(),
           powerW,
+          deltaKwh: mainAccounting.deltaKwh,
+          accountingDtSec: mainAccounting.accountingDtSec,
+          energySource: mainAccounting.energySource,
           status: "MAIN_METER",
           confidence: 1.0,
           virtualPowerW: vs.virtualPowerW,
@@ -179,7 +253,7 @@ export async function POST(request: Request) {
         continue;
       }
 
-      const [recentReadings, openSession] = await Promise.all([
+      const [recentReadingsDesc, openSession] = await Promise.all([
         db.telemetryReading.findMany({
           where: { machineId: machine.id },
           orderBy: { recordedAt: "desc" },
@@ -191,8 +265,36 @@ export async function POST(request: Request) {
         }),
       ]);
 
+      const latestPreviousReading = recentReadingsDesc[0] ?? null;
+
+      // Hitung durasi aktual, deteksi gap koneksi, & energi delta terpisah dari clamp ML 60 detik
+      const accounting = computeIntervalAccounting({
+        prevReading: latestPreviousReading
+          ? {
+              recordedAt: latestPreviousReading.recordedAt,
+              powerW: latestPreviousReading.powerW,
+              cumulativeEnergyKwh: latestPreviousReading.cumulativeEnergyKwh,
+            }
+          : null,
+        currRecordedAt: recordedAt,
+        currPowerW: powerW,
+        currCumulativeEnergyKwh: cumulativeEnergyKwh,
+        ratedPowerW: machine.ratedPowerW,
+      });
+
+      if (accounting.shouldSkip) {
+        if (accounting.kind === "OUT_OF_ORDER") {
+          skippedOutOfOrder++;
+        } else {
+          skippedDuplicates++;
+        }
+        continue;
+      }
+
+      const recentReadingsAsc = [...recentReadingsDesc].reverse();
+
       const windowSamples: PowerSample[] = [
-        ...recentReadings.reverse().map((r) => ({
+        ...recentReadingsAsc.map((r) => ({
           sampleIndex: r.sampleIndex,
           recordedAt: r.recordedAt,
           powerW: r.powerW,
@@ -204,23 +306,25 @@ export async function POST(request: Request) {
           sampleIndex,
           recordedAt,
           powerW,
-          voltageV: item.metrics?.voltage_v ?? null,
-          currentA: item.metrics?.current_a ?? null,
-          powerFactor: item.metrics?.power_factor ?? null,
+          voltageV,
+          currentA,
+          powerFactor,
         },
       ];
 
-      const prevHysteresis: HysteresisState | undefined = openSession
-        ? {
-            stableStatus: openSession.status,
-            pendingIdleCount:
-              openSession.status === "WORKING" &&
-              recentReadings[recentReadings.length - 1]?.predictedStatus ===
-                "IDLE"
-                ? 1
-                : 0,
-          }
-        : undefined;
+      // Jika terdeteksi gap koneksi panjang, reset hysteresis agar status baru bersih
+      const prevHysteresis: HysteresisState | undefined =
+        openSession && !accounting.sessionGapDetected
+          ? {
+              stableStatus: openSession.status,
+              pendingIdleCount:
+                openSession.status === "WORKING" &&
+                recentReadingsAsc[recentReadingsAsc.length - 1]
+                  ?.predictedStatus === "IDLE"
+                  ? 1
+                  : 0,
+            }
+          : undefined;
 
       const { result: classification } = classifyTelemetryWindow({
         windowSamples,
@@ -228,39 +332,55 @@ export async function POST(request: Request) {
         prevHysteresisState: prevHysteresis,
       });
 
-      const dtSec = Math.max(1, Math.round(classification.features.dtSec));
-      const deltaKwh = calculateEnergyKwhFromPower(powerW, dtSec);
+      const dtSec = Math.max(1, Math.round(accounting.accountingDtSec));
+      const deltaKwh = accounting.deltaKwh;
 
-      await db.telemetryReading.create({
-        data: {
-          deviceId: device.id,
-          machineId: machine.id,
-          sampleIndex,
-          recordedAt,
-          powerW,
-          voltageV: item.metrics?.voltage_v ?? null,
-          currentA: item.metrics?.current_a ?? null,
-          energyKwh: item.metrics?.energy_kwh ?? deltaKwh,
-          frequencyHz: item.metrics?.frequency_hz ?? null,
-          powerFactor: item.metrics?.power_factor ?? null,
-          predictedStatus: classification.status,
-          statusConfidence: classification.confidence,
-          isSimulated: Boolean(item.is_simulated),
-        },
-      });
+      try {
+        await db.telemetryReading.create({
+          data: {
+            deviceId: device.id,
+            machineId: machine.id,
+            sampleIndex,
+            recordedAt,
+            powerW,
+            voltageV,
+            currentA,
+            energyKwh: deltaKwh, // Selalu energi delta per interval (kWh)
+            cumulativeEnergyKwh, // Selalu meter kumulatif mentah PZEM (opsional)
+            frequencyHz,
+            powerFactor,
+            predictedStatus: classification.status,
+            statusConfidence: classification.confidence,
+            isSimulated,
+          },
+        });
+      } catch (err) {
+        // Guard race condition apabila dua request retry ESP32 tiba paralel
+        if (isPrismaUniqueConstraintError(err)) {
+          skippedDuplicates++;
+          continue;
+        }
+        throw err;
+      }
 
-      // Update atau buka MachineStateSession baru
+      // Update atau buka MachineStateSession baru dengan penanganan gap koneksi
       let currentIdleDurationMin = 0;
       let currentSessionLossIdr = 0;
 
-      if (openSession && openSession.status === classification.status) {
+      const canContinueOpenSession =
+        Boolean(openSession) &&
+        !accounting.sessionGapDetected &&
+        openSession!.status === classification.status;
+
+      if (canContinueOpenSession && openSession) {
         const nextDurationSec = openSession.durationSec + dtSec;
         const nextEnergyKwh = Number(
           (openSession.energyKwh + deltaKwh).toFixed(6)
         );
         const nextAvgPowerW = Number(
           (
-            (openSession.avgPowerW * openSession.durationSec + powerW * dtSec) /
+            (openSession.avgPowerW * openSession.durationSec +
+              accounting.intervalAvgPowerW * dtSec) /
             Math.max(1, nextDurationSec)
           ).toFixed(1)
         );
@@ -280,11 +400,18 @@ export async function POST(request: Request) {
         currentSessionLossIdr = nextCostIdr;
       } else {
         if (openSession) {
+          // Saat gap koneksi, tutup sesi lama di timestamp sampel terakhir sebelum offline
+          const closeAt =
+            accounting.sessionGapDetected && latestPreviousReading
+              ? latestPreviousReading.recordedAt
+              : recordedAt;
+
           await db.machineStateSession.update({
             where: { id: openSession.id },
-            data: { endedAt: recordedAt },
+            data: { endedAt: closeAt },
           });
         }
+
         const initCostIdr = calculateCostIdr(deltaKwh, tariffIdr);
         await db.machineStateSession.create({
           data: {
@@ -356,6 +483,9 @@ export async function POST(request: Request) {
       processedResults.push({
         recordedAt: recordedAt.toISOString(),
         powerW,
+        deltaKwh,
+        accountingDtSec: dtSec,
+        energySource: accounting.energySource,
         status: classification.status,
         confidence: classification.confidence,
         urgentAlertSent,
@@ -366,6 +496,8 @@ export async function POST(request: Request) {
       ok: true,
       deviceUid,
       processedCount: processedResults.length,
+      skippedDuplicates,
+      skippedOutOfOrder,
       results: processedResults,
     });
   } catch (err) {
