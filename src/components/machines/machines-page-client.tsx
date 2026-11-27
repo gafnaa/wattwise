@@ -1,9 +1,11 @@
 "use client";
 
 import * as React from "react";
-import { Download, Play, RefreshCw } from "lucide-react";
+import { ArrowUpRight, Download, Play, RefreshCw } from "lucide-react";
+import type { MachineEventItem } from "@/app/api/machines/events/route";
 import { EnergyConsumptionCard } from "@/components/dashboard/energy-consumption-card";
 import { AppShell } from "@/components/layout/app-shell";
+import { MachineTelemetryDialog } from "@/components/machines/machine-telemetry-dialog";
 import { Button } from "@/components/ui/button";
 import {
   machineStatusToPill,
@@ -112,25 +114,57 @@ export function MachinesPageClient() {
   const [events, setEvents] = React.useState<EventLogEntry[]>(() =>
     buildInitialEvents(INITIAL_MACHINES)
   );
+  const [eventsFromDb, setEventsFromDb] = React.useState(false);
+  const [selectedMachine, setSelectedMachine] =
+    React.useState<MachineCardData | null>(null);
   const [lastUpdated, setLastUpdated] = React.useState("Baru saja");
   const [tickBusy, setTickBusy] = React.useState(false);
 
   const loadOverview = React.useCallback(async () => {
     try {
-      const res = await fetch("/api/dashboard/overview?range=today", {
-        cache: "no-store",
-      });
-      if (!res.ok) return;
-      const data = (await res.json()) as DashboardOverviewResponse;
-      if (data?.machines) {
-        setOverview(data);
-        setEvents(buildInitialEvents(data.machines, Date.now()));
-        setLastUpdated(
-          new Date().toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }) + " WIB"
-        );
+      const [overviewRes, eventsRes] = await Promise.all([
+        fetch("/api/dashboard/overview?range=today", { cache: "no-store" }),
+        fetch("/api/machines/events?limit=8", { cache: "no-store" }),
+      ]);
+
+      let loadedMachines: MachineCardData[] | null = null;
+      if (overviewRes.ok) {
+        const data = (await overviewRes.json()) as DashboardOverviewResponse;
+        if (data?.machines) {
+          setOverview(data);
+          loadedMachines = data.machines;
+          setLastUpdated(
+            new Date().toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }) + " WIB"
+          );
+        }
+      }
+
+      if (eventsRes.ok) {
+        const evData = (await eventsRes.json()) as {
+          dataSource?: "database" | "demo";
+          events?: MachineEventItem[];
+        };
+        if (Array.isArray(evData.events) && evData.events.length > 0) {
+          setEvents(
+            evData.events.map((ev) => ({
+              id: ev.id,
+              time: ev.timeLabel,
+              machineName: ev.machineName,
+              message: ev.message,
+              tone: ev.tone,
+            }))
+          );
+          setEventsFromDb(evData.dataSource === "database");
+          return;
+        }
+      }
+
+      if (loadedMachines) {
+        setEvents(buildInitialEvents(loadedMachines, Date.now()));
+        setEventsFromDb(false);
       }
     } catch {
       // fallback tetap tampil
@@ -139,18 +173,47 @@ export function MachinesPageClient() {
 
   React.useEffect(() => {
     let active = true;
-    fetch("/api/dashboard/overview?range=today", { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: DashboardOverviewResponse | null) => {
-        if (!active || !data?.machines) return;
-        setOverview(data);
-        setEvents(buildInitialEvents(data.machines, Date.now()));
-        setLastUpdated(
-          new Date().toLocaleTimeString("id-ID", {
-            hour: "2-digit",
-            minute: "2-digit",
-          }) + " WIB"
-        );
+    Promise.all([
+      fetch("/api/dashboard/overview?range=today", { cache: "no-store" }).then(
+        (res) =>
+          res.ok ? (res.json() as Promise<DashboardOverviewResponse>) : null
+      ),
+      fetch("/api/machines/events?limit=8", { cache: "no-store" }).then((res) =>
+        res.ok
+          ? (res.json() as Promise<{
+              dataSource?: "database" | "demo";
+              events?: MachineEventItem[];
+            }>)
+          : null
+      ),
+    ])
+      .then(([data, evData]) => {
+        if (!active) return;
+        if (data?.machines) {
+          setOverview(data);
+          setLastUpdated(
+            new Date().toLocaleTimeString("id-ID", {
+              hour: "2-digit",
+              minute: "2-digit",
+            }) + " WIB"
+          );
+        }
+
+        if (Array.isArray(evData?.events) && evData.events.length > 0) {
+          setEvents(
+            evData.events.map((ev) => ({
+              id: ev.id,
+              time: ev.timeLabel,
+              machineName: ev.machineName,
+              message: ev.message,
+              tone: ev.tone,
+            }))
+          );
+          setEventsFromDb(evData.dataSource === "database");
+        } else if (data?.machines) {
+          setEvents(buildInitialEvents(data.machines, Date.now()));
+          setEventsFromDb(false);
+        }
       })
       .catch(() => null);
 
@@ -414,6 +477,21 @@ export function MachinesPageClient() {
                     />
                   </div>
                 </div>
+
+                {/* Card Footer: Idle Threshold + Per-Machine Telemetry Detail */}
+                <div className="mt-4 flex items-center justify-between border-t border-border/70 pt-3 text-[11.5px]">
+                  <span className="text-muted-foreground">
+                    Batas idle {m.idleAlertThresholdMin} mnt
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setSelectedMachine(m)}
+                    className="inline-flex items-center gap-1 font-medium text-[#047857] transition-colors hover:text-[#059669] dark:text-emerald-400 dark:hover:text-emerald-300"
+                  >
+                    <span>Detail telemetri</span>
+                    <ArrowUpRight className="size-3.5" />
+                  </button>
+                </div>
               </div>
             );
           })}
@@ -423,10 +501,12 @@ export function MachinesPageClient() {
         <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
           <div className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 xl:col-span-4">
             <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
-              Log Kejadian Hari Ini
+              Log Kejadian Terbaru
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
-              Transisi status terbaru hasil klasifikasi Random Forest
+              {eventsFromDb
+                ? "Sesi transisi status aktual dari Random Forest (Supabase)"
+                : "Transisi status terbaru hasil klasifikasi Random Forest"}
             </p>
             <div className="mt-4 space-y-4">
               {events.map((ev) => (
@@ -464,6 +544,12 @@ export function MachinesPageClient() {
           </div>
         </section>
       </div>
+
+      <MachineTelemetryDialog
+        key={selectedMachine?.id ?? "closed"}
+        machine={selectedMachine}
+        onClose={() => setSelectedMachine(null)}
+      />
     </AppShell>
   );
 }
