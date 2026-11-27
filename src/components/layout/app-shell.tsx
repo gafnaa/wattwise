@@ -5,17 +5,28 @@ import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import {
   Activity,
+  BarChart3,
+  Bell,
+  Calendar,
+  ChevronRight,
+  ChevronsUpDown,
   Cpu,
-  LayoutDashboard,
+  FileText,
+  Info,
+  LayoutGrid,
   LogOut,
   Menu,
-  Settings2,
+  Moon,
+  PanelLeft,
+  Radio,
+  Settings,
+  SlidersHorizontal,
   Sparkles,
+  Sun,
   X,
   Zap,
 } from "lucide-react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
-import { Badge } from "@/components/ui/badge";
+import { useWattWiseTheme } from "@/components/providers/app-providers";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -26,31 +37,153 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { WORKSHOP_INFO } from "@/lib/mock-dashboard-data";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import type { DateRangeKey } from "@/lib/mock-dashboard-data";
 
 export interface AppShellProps {
   title: string;
+  section?: "Menu Utama" | "Manajemen";
   dataSource?: "database" | "demo";
-  actions?: React.ReactNode;
+  workshopName?: string;
+  ownerName?: string;
+  ownerRole?: string;
+  onlineDevices?: number;
+  totalDevices?: number;
+  pendingRecommendationsCount?: number;
+  range?: DateRangeKey;
+  onRangeChange?: (range: DateRangeKey) => void;
+  headerActions?: React.ReactNode;
   children: React.ReactNode;
 }
 
-const NAV_ITEMS = [
-  { href: "/dashboard", label: "Ringkasan", icon: LayoutDashboard },
-  { href: "/machines", label: "Mesin", icon: Cpu },
-  { href: "/actions", label: "Hemat & Aksi", icon: Sparkles },
-  { href: "/settings", label: "Pengaturan", icon: Settings2 },
+const MAIN_NAV = [
+  { href: "/dashboard", label: "Ringkasan", icon: LayoutGrid },
+  { href: "/machines", label: "Monitoring Mesin", icon: Activity },
+  { href: "/analytics", label: "Analisis Energi", icon: BarChart3 },
+  {
+    href: "/actions",
+    label: "Rekomendasi AI",
+    icon: Sparkles,
+    showBadge: true,
+  },
+  { href: "/reports", label: "Laporan", icon: FileText },
 ] as const;
+
+const MANAGEMENT_NAV = [
+  { href: "/management/machines", label: "Manajemen Mesin", icon: Cpu },
+  { href: "/devices", label: "Perangkat IoT", icon: Radio },
+  { href: "/settings", label: "Pengaturan", icon: SlidersHorizontal },
+] as const;
+
+const RANGE_LABELS: Record<DateRangeKey, string> = {
+  month: "30 Hari Terakhir",
+  week: "7 Hari Terakhir",
+  today: "Hari Ini",
+};
+
+function getInitials(name: string): string {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "WW";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
+}
 
 export function AppShell({
   title,
-  dataSource = "demo",
-  actions,
+  section = "Menu Utama",
+  dataSource = "database",
+  workshopName = "Area Produksi Furnitur",
+  ownerName = "Pemilik Pabrik",
+  ownerRole = "Pemilik",
+  onlineDevices = 6,
+  totalDevices = 7,
+  pendingRecommendationsCount,
+  range = "month",
+  onRangeChange,
+  headerActions,
   children,
 }: AppShellProps) {
   const pathname = usePathname();
   const router = useRouter();
-  const [mobileNavOpen, setMobileNavOpen] = React.useState(false);
+  const { theme, setTheme } = useWattWiseTheme();
+  const [collapsed, setCollapsed] = React.useState(false);
+  const [mobileOpen, setMobileOpen] = React.useState(false);
+  const [liveMeta, setLiveMeta] = React.useState<{
+    workshopName: string;
+    ownerName: string;
+    ownerRole: string;
+    onlineDevices: number;
+    totalDevices: number;
+    pendingCount: number;
+  } | null>(null);
+
+  React.useEffect(() => {
+    let active = true;
+    fetch("/api/auth/me", { cache: "no-store" })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((me) => {
+        if (!active || !me) return;
+        setLiveMeta((prev) => ({
+          workshopName: me.user?.workshopName ?? prev?.workshopName ?? workshopName,
+          ownerName: me.user?.fullName ?? prev?.ownerName ?? ownerName,
+          ownerRole:
+            me.user?.role === "TECHNICIAN"
+              ? "Teknisi"
+              : me.user?.role === "ADMIN"
+                ? "Admin"
+                : "Pemilik",
+          onlineDevices: me.hardwareStatus?.esp32Online ?? onlineDevices,
+          totalDevices: me.hardwareStatus?.esp32Total ?? totalDevices,
+          pendingCount: prev?.pendingCount ?? pendingRecommendationsCount ?? 0,
+        }));
+      })
+      .catch(() => null);
+
+    if (pendingRecommendationsCount === undefined) {
+      fetch("/api/recommendations?status=PENDING", { cache: "no-store" })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((rec) => {
+          if (!active || !rec) return;
+          const count = Array.isArray(rec.recommendations)
+            ? rec.recommendations.length
+            : 0;
+          setLiveMeta((prev) => ({
+            workshopName: prev?.workshopName ?? workshopName,
+            ownerName: prev?.ownerName ?? ownerName,
+            ownerRole: prev?.ownerRole ?? ownerRole,
+            onlineDevices: prev?.onlineDevices ?? onlineDevices,
+            totalDevices: prev?.totalDevices ?? totalDevices,
+            pendingCount: count,
+          }));
+        })
+        .catch(() => null);
+    }
+
+    return () => {
+      active = false;
+    };
+  }, [
+    onlineDevices,
+    ownerName,
+    ownerRole,
+    pendingRecommendationsCount,
+    totalDevices,
+    workshopName,
+  ]);
+
+  const effectiveWorkshop = liveMeta?.workshopName ?? workshopName;
+  const effectiveOwner = liveMeta?.ownerName ?? ownerName;
+  const effectiveRole = liveMeta?.ownerRole ?? ownerRole;
+  const effectiveOnline = liveMeta?.onlineDevices ?? onlineDevices;
+  const effectiveTotal = liveMeta?.totalDevices ?? totalDevices;
+  const effectivePending =
+    pendingRecommendationsCount ?? liveMeta?.pendingCount ?? 0;
 
   async function handleLogout() {
     try {
@@ -60,188 +193,379 @@ export function AppShell({
     }
   }
 
-  return (
-    <div className="flex min-h-screen bg-[#080b11] text-foreground">
-      {/* Desktop Sidebar */}
-      <aside className="hidden w-60 shrink-0 flex-col border-r border-border/70 bg-[#0b0f18] lg:flex">
-        {/* Brand */}
-        <div className="flex h-15 items-center gap-2.5 border-b border-border/60 px-5">
-          <div className="flex size-8 items-center justify-center rounded-lg bg-gradient-to-br from-orange-500 to-amber-600 text-white shadow-md shadow-orange-600/20">
+  function isNavActive(href: string) {
+    if (href === "/dashboard") return pathname === "/dashboard";
+    if (href === "/machines") return pathname === "/machines";
+    return pathname === href || pathname.startsWith(`${href}/`);
+  }
+
+  const sidebarNavContent = (isMobile = false) => (
+    <div className="flex h-full flex-col">
+      {/* Brand Row */}
+      <div className="flex h-[72px] shrink-0 items-center justify-between px-4">
+        <Link
+          href="/dashboard"
+          className="flex min-w-0 items-center gap-2.5"
+          onClick={() => isMobile && setMobileOpen(false)}
+        >
+          <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-[#059669] text-white shadow-xs">
             <Zap className="size-4 fill-white" />
           </div>
-          <div className="leading-tight">
-            <p className="text-sm font-bold tracking-tight text-white">
-              WattWise
-            </p>
-            <p className="text-[11px] text-zinc-500">Audit Energi</p>
-          </div>
-        </div>
-
-        {/* Navigation Links */}
-        <nav className="flex-1 space-y-1 p-3">
-          {NAV_ITEMS.map((item) => {
-            const Icon = item.icon;
-            const active =
-              pathname === item.href ||
-              (item.href !== "/dashboard" && pathname.startsWith(item.href));
-
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors ${
-                  active
-                    ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30"
-                    : "text-zinc-400 hover:bg-muted/60 hover:text-zinc-100"
-                }`}
-              >
-                <Icon
-                  className={`size-4 ${
-                    active ? "text-orange-400" : "text-zinc-500"
-                  }`}
-                />
-                <span>{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-
-        {/* Sidebar Footer: Workshop & Live Status */}
-        <div className="border-t border-border/60 p-4 space-y-2.5">
-          <div className="rounded-lg border border-border/70 bg-background/60 px-3 py-2.5">
-            <p className="truncate text-xs font-medium text-zinc-200">
-              {WORKSHOP_INFO.name}
-            </p>
-            <div className="mt-1.5 flex items-center justify-between text-[11px]">
-              <span className="inline-flex items-center gap-1.5 text-emerald-400">
-                <span className="relative flex size-1.5">
-                  <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                  <span className="relative inline-flex size-1.5 rounded-full bg-emerald-500" />
-                </span>
-                ESP32 Online
-              </span>
-              <span className="font-mono text-zinc-500">
-                {WORKSHOP_INFO.esp32OnlineCount}/{WORKSHOP_INFO.esp32TotalCount}
-              </span>
+          {(!collapsed || isMobile) && (
+            <div className="min-w-0 leading-tight">
+              <p className="truncate text-[14px] font-semibold tracking-tight text-foreground">
+                WattWise
+              </p>
+              <p className="truncate text-[11px] text-muted-foreground">
+                Energy Intelligence
+              </p>
             </div>
+          )}
+        </Link>
+        {!isMobile && (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon"
+            onClick={() => setCollapsed((v) => !v)}
+            className="size-7 text-muted-foreground hover:text-foreground"
+            aria-label="Toggle sidebar"
+          >
+            <PanelLeft className="size-4" />
+          </Button>
+        )}
+      </div>
+
+      {/* Navigation Groups */}
+      <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-2">
+        <div>
+          {(!collapsed || isMobile) && (
+            <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+              Menu Utama
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {MAIN_NAV.map((item) => {
+              const Icon = item.icon;
+              const active = isNavActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => isMobile && setMobileOpen(false)}
+                  className={`flex items-center justify-between gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                    active
+                      ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
+                      : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  <span className="flex min-w-0 items-center gap-2.5">
+                    <Icon
+                      className={`size-4 shrink-0 ${
+                        active
+                          ? "text-[#059669] dark:text-emerald-400"
+                          : "text-zinc-500 dark:text-zinc-400"
+                      }`}
+                    />
+                    {(!collapsed || isMobile) && (
+                      <span className="truncate">{item.label}</span>
+                    )}
+                  </span>
+                  {(!collapsed || isMobile) &&
+                    "showBadge" in item &&
+                    item.showBadge &&
+                    effectivePending > 0 && (
+                      <span className="flex h-5 min-w-5 items-center justify-center rounded-full bg-[#F5F3FF] px-1.5 text-[11px] font-semibold text-[#6D28D9] tabular-nums dark:bg-violet-950/70 dark:text-violet-300">
+                        {effectivePending}
+                      </span>
+                    )}
+                </Link>
+              );
+            })}
           </div>
         </div>
+
+        <div>
+          {(!collapsed || isMobile) && (
+            <p className="mb-1.5 px-2.5 text-[10.5px] font-semibold tracking-wider text-muted-foreground/80 uppercase">
+              Manajemen
+            </p>
+          )}
+          <div className="space-y-0.5">
+            {MANAGEMENT_NAV.map((item) => {
+              const Icon = item.icon;
+              const active = isNavActive(item.href);
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  onClick={() => isMobile && setMobileOpen(false)}
+                  className={`flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-[13px] font-medium transition-colors ${
+                    active
+                      ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
+                      : "text-zinc-600 hover:bg-zinc-100 hover:text-zinc-950 dark:text-zinc-400 dark:hover:bg-zinc-800/70 dark:hover:text-zinc-100"
+                  }`}
+                >
+                  <Icon
+                    className={`size-4 shrink-0 ${
+                      active
+                        ? "text-[#059669] dark:text-emerald-400"
+                        : "text-zinc-500 dark:text-zinc-400"
+                    }`}
+                  />
+                  {(!collapsed || isMobile) && (
+                    <span className="truncate">{item.label}</span>
+                  )}
+                </Link>
+              );
+            })}
+          </div>
+        </div>
+      </nav>
+
+      {/* Bottom Footer Stack */}
+      <div className="shrink-0 space-y-3 border-t border-border p-3">
+        {(!collapsed || isMobile) && (
+          <div
+            className={
+              dataSource === "demo"
+                ? "rounded-xl border border-amber-200/80 bg-[#FFFBEB] p-3 text-xs dark:border-amber-900/60 dark:bg-amber-950/30"
+                : "rounded-xl border border-emerald-200/80 bg-[#ECFDF5] p-3 text-xs dark:border-emerald-900/60 dark:bg-emerald-950/30"
+            }
+          >
+            <div
+              className={`flex items-center gap-1.5 font-semibold ${
+                dataSource === "demo"
+                  ? "text-[#B45309] dark:text-amber-300"
+                  : "text-[#047857] dark:text-emerald-300"
+              }`}
+            >
+              <Info className="size-3.5 shrink-0" />
+              <span>{dataSource === "demo" ? "Mode Demo" : "Terhubung Live"}</span>
+            </div>
+            <p className="mt-1 text-[11.5px] leading-relaxed text-zinc-600 dark:text-zinc-400">
+              {dataSource === "demo"
+                ? "Sebagian data menggunakan simulasi baseline."
+                : "Database Supabase & AI Advisor aktif real-time."}
+            </p>
+          </div>
+        )}
+
+        {/* Theme Switcher: Terang / Gelap */}
+        {(!collapsed || isMobile) && (
+          <div className="grid grid-cols-2 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => setTheme("light")}
+              className={`flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium transition-colors ${
+                theme === "light"
+                  ? "bg-card text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Sun className="size-3.5" />
+              <span>Terang</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setTheme("dark")}
+              className={`flex items-center justify-center gap-1.5 rounded-md py-1.5 font-medium transition-colors ${
+                theme === "dark"
+                  ? "bg-card text-foreground shadow-2xs"
+                  : "text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              <Moon className="size-3.5" />
+              <span>Gelap</span>
+            </button>
+          </div>
+        )}
+
+        {/* Workspace / Owner Profile */}
+        <DropdownMenu>
+          <DropdownMenuTrigger
+            render={
+              <button
+                type="button"
+                className="flex w-full items-center justify-between gap-2.5 rounded-lg p-1.5 text-left transition-colors hover:bg-muted"
+              />
+            }
+          >
+            <div className="flex min-w-0 items-center gap-2.5">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ECFDF5] text-xs font-semibold text-[#047857] dark:bg-emerald-950 dark:text-emerald-300">
+                {getInitials(effectiveWorkshop)}
+              </div>
+              {(!collapsed || isMobile) && (
+                <div className="min-w-0 leading-tight">
+                  <p className="truncate text-xs font-semibold text-foreground">
+                    {effectiveWorkshop}
+                  </p>
+                  <p className="truncate text-[11px] text-muted-foreground">
+                    {effectiveOwner} · {effectiveRole}
+                  </p>
+                </div>
+              )}
+            </div>
+            {(!collapsed || isMobile) && (
+              <ChevronsUpDown className="size-3.5 shrink-0 text-muted-foreground" />
+            )}
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-52">
+            <DropdownMenuGroup>
+              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
+                {effectiveOwner} ({effectiveRole})
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                render={<Link href="/settings" />}
+                className="text-xs"
+              >
+                <Settings className="mr-2 size-3.5" />
+                Pengaturan Workshop
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                variant="destructive"
+                onClick={handleLogout}
+                className="text-xs"
+              >
+                <LogOut className="mr-2 size-3.5" />
+                Keluar
+              </DropdownMenuItem>
+            </DropdownMenuGroup>
+          </DropdownMenuContent>
+        </DropdownMenu>
+      </div>
+    </div>
+  );
+
+  return (
+    <div className="flex min-h-screen bg-background text-foreground">
+      {/* Desktop Sidebar */}
+      <aside
+        className={`hidden shrink-0 border-r border-border bg-sidebar transition-[width] duration-200 lg:block ${
+          collapsed ? "w-[72px]" : "w-[256px]"
+        }`}
+      >
+        <div className="sticky top-0 h-screen">{sidebarNavContent(false)}</div>
       </aside>
 
-      {/* Main Column */}
+      {/* Mobile Drawer */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 flex lg:hidden">
+          <div
+            className="fixed inset-0 bg-black/40 backdrop-blur-[1px]"
+            onClick={() => setMobileOpen(false)}
+          />
+          <div className="relative z-10 flex w-[264px] max-w-[85vw] flex-col bg-sidebar shadow-xl">
+            <button
+              type="button"
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-5 right-3 rounded-md p-1 text-muted-foreground hover:bg-muted"
+              aria-label="Tutup menu"
+            >
+              <X className="size-4" />
+            </button>
+            {sidebarNavContent(true)}
+          </div>
+        </div>
+      )}
+
+      {/* Right Main Area */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Top Bar */}
-        <header className="sticky top-0 z-30 flex h-15 items-center justify-between gap-3 border-b border-border/70 bg-[#0b0f18]/90 px-4 backdrop-blur-md sm:px-6">
-          <div className="flex items-center gap-3">
+        {/* Top Header (72px) */}
+        <header className="sticky top-0 z-30 flex h-[72px] shrink-0 items-center justify-between gap-3 border-b border-border bg-card/95 px-4 backdrop-blur-md sm:px-7">
+          <div className="flex min-w-0 items-center gap-3">
             <Button
               type="button"
               variant="ghost"
               size="icon"
-              onClick={() => setMobileNavOpen((prev) => !prev)}
+              onClick={() => setMobileOpen(true)}
               className="size-8 lg:hidden"
-              aria-label="Menu navigasi"
+              aria-label="Buka navigasi"
             >
-              {mobileNavOpen ? (
-                <X className="size-4" />
-              ) : (
-                <Menu className="size-4" />
-              )}
+              <Menu className="size-4" />
             </Button>
 
-            <h1 className="text-base font-semibold tracking-tight text-white">
-              {title}
-            </h1>
-
-            <Badge
-              variant="outline"
-              className={
-                dataSource === "database"
-                  ? "hidden border-emerald-500/30 bg-emerald-500/10 text-[10px] text-emerald-300 sm:inline-flex"
-                  : "hidden border-zinc-700 bg-zinc-900 text-[10px] text-zinc-400 sm:inline-flex"
-              }
-            >
-              <Activity className="mr-1 size-3" />
-              {dataSource === "database" ? "Live DB" : "Demo"}
-            </Badge>
+            <div className="min-w-0">
+              <div className="hidden items-center gap-1 text-[11px] text-muted-foreground sm:flex">
+                <span>WattWise</span>
+                <ChevronRight className="size-3" />
+                <span>{section}</span>
+                <ChevronRight className="size-3" />
+                <span className="font-medium text-foreground">{title}</span>
+              </div>
+              <h1 className="truncate text-[18px] font-semibold tracking-tight text-foreground sm:text-[20px]">
+                {title}
+              </h1>
+            </div>
           </div>
 
-          <div className="flex items-center gap-2 sm:gap-2.5">
-            {actions}
+          <div className="flex shrink-0 items-center gap-2 sm:gap-2.5">
+            {/* Device Status Pill */}
+            <Link
+              href="/devices"
+              className="hidden items-center gap-1.5 rounded-full bg-[#ECFDF5] px-3 py-1.5 text-xs font-medium text-[#047857] transition-colors hover:bg-emerald-100 md:inline-flex dark:bg-emerald-950/70 dark:text-emerald-300"
+            >
+              <span className="size-1.5 rounded-full bg-[#16A34A]" />
+              <span>
+                Terhubung · {effectiveOnline}/{effectiveTotal} perangkat
+              </span>
+            </Link>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                render={
-                  <Button
-                    variant="ghost"
-                    className="h-8 gap-2 rounded-lg px-2 hover:bg-muted/70"
-                  />
-                }
+            {/* Period Selector */}
+            {onRangeChange ? (
+              <Select
+                value={range}
+                onValueChange={(val) => {
+                  if (val === "month" || val === "week" || val === "today") {
+                    onRangeChange(val);
+                  }
+                }}
               >
-                <Avatar className="size-6.5 border border-orange-500/40">
-                  <AvatarFallback className="bg-orange-600/20 text-[11px] font-semibold text-orange-300">
-                    PP
-                  </AvatarFallback>
-                </Avatar>
-                <span className="hidden text-xs font-medium text-zinc-200 sm:inline">
-                  {WORKSHOP_INFO.ownerName}
-                </span>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuGroup>
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
-                    {WORKSHOP_INFO.code}
-                  </DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem
-                    render={<Link href="/settings" />}
-                    className="text-xs"
-                  >
-                    <Settings2 className="mr-2 size-3.5" />
-                    Pengaturan
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    variant="destructive"
-                    onClick={handleLogout}
-                    className="text-xs"
-                  >
-                    <LogOut className="mr-2 size-3.5" />
-                    Keluar
-                  </DropdownMenuItem>
-                </DropdownMenuGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
+                <SelectTrigger className="h-9 w-[158px] rounded-lg border-border bg-card text-xs font-medium">
+                  <Calendar className="mr-1.5 size-3.5 text-muted-foreground" />
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="month">{RANGE_LABELS.month}</SelectItem>
+                  <SelectItem value="week">{RANGE_LABELS.week}</SelectItem>
+                  <SelectItem value="today">{RANGE_LABELS.today}</SelectItem>
+                </SelectContent>
+              </Select>
+            ) : (
+              <div className="hidden h-9 items-center gap-1.5 rounded-lg border border-border bg-card px-3 text-xs font-medium text-foreground sm:inline-flex">
+                <Calendar className="size-3.5 text-muted-foreground" />
+                <span>{RANGE_LABELS[range]}</span>
+              </div>
+            )}
+
+            {headerActions}
+
+            {/* Bell */}
+            <Link
+              href="/actions"
+              className="relative flex size-9 items-center justify-center rounded-lg border border-border bg-card text-muted-foreground transition-colors hover:bg-muted hover:text-foreground"
+              aria-label="Rekomendasi dan notifikasi"
+            >
+              <Bell className="size-4" />
+              {effectivePending > 0 && (
+                <span className="absolute top-2 right-2 size-1.5 rounded-full bg-[#DC2626]" />
+              )}
+            </Link>
+
+            {/* User Avatar */}
+            <Link
+              href="/settings"
+              className="flex size-9 items-center justify-center rounded-full bg-[#ECFDF5] text-xs font-semibold text-[#047857] ring-1 ring-emerald-200 transition-colors hover:bg-emerald-100 dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-800"
+              title={`${effectiveOwner} · Pengaturan`}
+            >
+              {getInitials(effectiveOwner)}
+            </Link>
           </div>
         </header>
 
-        {/* Mobile Drawer Nav */}
-        {mobileNavOpen && (
-          <nav className="border-b border-border/70 bg-[#0b0f18] p-3 lg:hidden">
-            <div className="grid grid-cols-2 gap-1.5">
-              {NAV_ITEMS.map((item) => {
-                const Icon = item.icon;
-                const active = pathname === item.href;
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setMobileNavOpen(false)}
-                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
-                      active
-                        ? "bg-orange-500/15 text-orange-300 ring-1 ring-orange-500/30"
-                        : "text-zinc-400 hover:bg-muted/60 hover:text-white"
-                    }`}
-                  >
-                    <Icon className="size-3.5" />
-                    <span>{item.label}</span>
-                  </Link>
-                );
-              })}
-            </div>
-          </nav>
-        )}
-
-        {/* Page Body */}
-        <main className="mx-auto w-full max-w-[1360px] flex-1 p-4 sm:p-6">
+        {/* Main Content Canvas */}
+        <main className="mx-auto w-full max-w-[1280px] flex-1 px-4 py-6 sm:px-7">
           {children}
         </main>
       </div>
