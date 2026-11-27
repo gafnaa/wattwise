@@ -6,6 +6,7 @@ import {
   timingSafeEqualHex,
   verifySessionToken,
 } from "../auth";
+import { telemetryBodySchema } from "../iot/telemetry-schema";
 import { sendTelegramMessage } from "../telegram/bot";
 
 test("JWT session token signs and verifies Workshop Owner payload cleanly", async () => {
@@ -56,4 +57,31 @@ test("Telegram client falls back safely to simulated mode when token is unset", 
       process.env.TELEGRAM_BOT_TOKEN = prevToken;
     }
   }
+});
+
+test("Telemetry schema parses batch readings and single payloads without stripping batch arrays", () => {
+  const batchParsed = telemetryBodySchema.safeParse({
+    device_uid: "ESP32-CNC-1325",
+    readings: [
+      { index: 1, timestamp: "2026-11-27T00:00:00.000Z", daya: 4 },
+      { index: 2, timestamp: "2026-11-27T00:00:02.000Z", daya: 4450 },
+    ],
+  });
+  assert.equal(batchParsed.success, true);
+  assert.ok("readings" in batchParsed.data);
+  assert.equal(batchParsed.data.readings.length, 2);
+  assert.equal(batchParsed.data.readings[1]?.daya, 4450);
+
+  const singlePzem = telemetryBodySchema.safeParse({
+    device_uid: "ESP32-CNC-1325",
+    metrics: { voltage_v: 221.4, current_a: 19.2, power_w: 4250, power_factor: 0.91 },
+  });
+  assert.equal(singlePzem.success, true);
+  assert.ok(!("readings" in singlePzem.data));
+  assert.equal(singlePzem.data.metrics?.power_w, 4250);
+
+  const invalidEmpty = telemetryBodySchema.safeParse({
+    device_uid: "ESP32-CNC-1325",
+  });
+  assert.equal(invalidEmpty.success, false);
 });
