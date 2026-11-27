@@ -70,7 +70,7 @@ export function getAiProviderConfig(): AiProviderConfig {
     return {
       configured: true,
       provider: "gemini",
-      model: process.env.GEMINI_MODEL?.trim() || "gemini-2.5-flash",
+      model: process.env.GEMINI_MODEL?.trim() || "gemini-3.1-flash-lite",
       apiKey: geminiKey,
     };
   }
@@ -122,13 +122,19 @@ export function parseAiRecommendationResponse(rawText: string) {
   return aiRecommendationListSchema.parse(normalized);
 }
 
+const GEMINI_FALLBACK_MODELS = [
+  "gemini-3.1-flash-lite",
+  "gemini-3.5-flash-lite",
+  "gemini-3.8-flash",
+];
+
 async function callConfiguredLlm(params: {
   config: AiProviderConfig;
   systemPrompt: string;
   userPrompt: string;
   expectJson: boolean;
   fetchImpl?: typeof fetch;
-}): Promise<string> {
+}): Promise<{ text: string; usedModel: string }> {
   const { config, systemPrompt, userPrompt, expectJson } = params;
   const doFetch = params.fetchImpl ?? fetch;
 
@@ -136,54 +142,72 @@ async function callConfiguredLlm(params: {
     throw new Error("AI provider belum dikonfigurasi");
   }
 
-  const signal = AbortSignal.timeout(12_000);
-
   if (config.provider === "gemini") {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(config.model)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
-    const res = await doFetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      signal,
-      body: JSON.stringify({
-        systemInstruction: {
-          parts: [{ text: systemPrompt }],
-        },
-        contents: [
-          {
-            role: "user",
-            parts: [{ text: userPrompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: expectJson ? 0.25 : 0.35,
-          maxOutputTokens: expectJson ? 900 : 700,
-          ...(expectJson ? { responseMimeType: "application/json" } : {}),
-        },
-      }),
-    });
+    const modelsToTry = Array.from(
+      new Set([config.model, ...GEMINI_FALLBACK_MODELS])
+    );
+    let lastError = "Gemini request gagal";
 
-    const json = (await res.json().catch(() => ({}))) as {
-      candidates?: Array<{
-        content?: { parts?: Array<{ text?: string }> };
-      }>;
-      error?: { message?: string };
-    };
+    for (const candidateModel of modelsToTry) {
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(candidateModel)}:generateContent?key=${encodeURIComponent(config.apiKey)}`;
+      try {
+        const res = await doFetch(url, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          signal: AbortSignal.timeout(15_000),
+          body: JSON.stringify({
+            systemInstruction: {
+              parts: [{ text: systemPrompt }],
+            },
+            contents: [
+              {
+                role: "user",
+                parts: [{ text: userPrompt }],
+              },
+            ],
+            generationConfig: {
+              temperature: expectJson ? 0.25 : 0.35,
+              maxOutputTokens: expectJson ? 2048 : 1400,
+              ...(expectJson ? { responseMimeType: "application/json" } : {}),
+            },
+          }),
+        });
 
-    if (!res.ok) {
-      throw new Error(json.error?.message ?? `Gemini HTTP ${res.status}`);
+        const json = (await res.json().catch(() => ({}))) as {
+          candidates?: Array<{
+            content?: { parts?: Array<{ text?: string }> };
+          }>;
+          error?: { message?: string };
+        };
+
+        if (!res.ok) {
+          lastError = json.error?.message ?? `Gemini HTTP ${res.status}`;
+          // Coba model fallback berikutnya bila model 404/429/503
+          if (res.status === 404 || res.status === 429 || res.status >= 500) {
+            continue;
+          }
+          throw new Error(lastError);
+        }
+
+        const text = json.candidates?.[0]?.content?.parts
+          ?.map((p) => p.text ?? "")
+          .join("")
+          .trim();
+
+        if (!text) {
+          lastError = "Respons Gemini kosong";
+          continue;
+        }
+        return { text, usedModel: candidateModel };
+      } catch (err) {
+        lastError = err instanceof Error ? err.message : String(err);
+      }
     }
 
-    const text = json.candidates?.[0]?.content?.parts
-      ?.map((p) => p.text ?? "")
-      .join("")
-      .trim();
-
-    if (!text) {
-      throw new Error("Respons Gemini kosong");
-    }
-    return text;
+    throw new Error(lastError);
   }
 
+  const signal = AbortSignal.timeout(15_000);
   const endpoint =
     config.provider === "openrouter"
       ? "https://openrouter.ai/api/v1/chat/completions"
@@ -204,7 +228,7 @@ async function callConfiguredLlm(params: {
     body: JSON.stringify({
       model: config.model,
       temperature: expectJson ? 0.25 : 0.35,
-      max_tokens: expectJson ? 900 : 700,
+      max_tokens: expectJson ? 2048 : 1400,
       ...(expectJson ? { response_format: { type: "json_object" } } : {}),
       messages: [
         { role: "system", content: systemPrompt },
@@ -226,7 +250,7 @@ async function callConfiguredLlm(params: {
   if (!text) {
     throw new Error("Respons LLM kosong");
   }
-  return text;
+  return { text, usedModel: config.model };
 }
 
 /**
@@ -300,7 +324,7 @@ export async function generateGroundedAiRecommendations(
   });
 
   try {
-    const rawText = await callConfiguredLlm({
+    const { text: rawText, usedModel } = await callConfiguredLlm({
       config,
       systemPrompt,
       userPrompt,
@@ -340,7 +364,7 @@ export async function generateGroundedAiRecommendations(
     return {
       source: "AI_LLM",
       provider: config.provider,
-      model: config.model,
+      model: usedModel,
       recommendations: merged,
     };
   } catch (err) {
@@ -474,7 +498,7 @@ export async function answerEnergyQuestionWithAi(
   const userPrompt = `DATA_AUDIT_TERVERIFIKASI:\n${JSON.stringify(groundedContext)}\n\nPERTANYAAN_PENGGUNA:\n${input.question}`;
 
   try {
-    const answerText = await callConfiguredLlm({
+    const { text: answerText, usedModel } = await callConfiguredLlm({
       config,
       systemPrompt,
       userPrompt,
@@ -486,7 +510,7 @@ export async function answerEnergyQuestionWithAi(
       answerText,
       source: "AI_LLM",
       provider: config.provider,
-      model: config.model,
+      model: usedModel,
     };
   } catch {
     return {
