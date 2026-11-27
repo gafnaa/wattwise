@@ -26,59 +26,57 @@ const PIPELINE_STAGES = [
 export default function LoginPage() {
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
-      {/* Left Brand Column — Dithered Industrial Workshop Illustration */}
-      <section className="relative flex flex-col justify-between overflow-hidden bg-[#09090B] px-6 py-8 text-white sm:px-12 sm:py-12 lg:px-14">
-        {/* Bayer 4x4 Ordered-Dither Canvas Layer */}
+      {/* Left Brand Column — Sunlit Painterly Workshop with Crisp Bayer 4x4 Dither */}
+      <section className="relative flex flex-col justify-between overflow-hidden border-b border-border bg-[#141714] px-6 py-8 text-white sm:px-12 sm:py-12 lg:border-r lg:border-b-0 lg:px-14">
+        {/* Full-Visibility Lumno-Style Bayer 4x4 Ordered-Dither Canvas */}
         <DitherBackground
           src="/images/login-workshop-illustration.jpg"
-          cellSize={2}
-          brightness={-0.04}
-          contrast={1.14}
-          grain={0.95}
+          cellSize={3}
+          brightness={0.01}
+          contrast={1.06}
+          grain={0.85}
           levels={7}
-          className="opacity-55"
+          className="opacity-100"
         />
 
-        {/* Editorial Obsidian Scrim for Crisp Text Contrast */}
+        {/* Targeted Bottom Scrim ONLY behind text — keeps sunlit windows, greenery & CNC vibrant */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-b from-[#09090B]/85 via-[#09090B]/62 to-[#09090B]/92"
-        />
-        <div
-          aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-r from-[#09090B]/75 via-transparent to-[#09090B]/40"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B]/92 via-[#09090B]/48 via-45% to-transparent"
         />
 
-        {/* Foreground Content */}
-        <div className="relative z-10 flex items-center gap-3">
-          <div className="flex size-10 items-center justify-center rounded-xl bg-[#059669] text-white shadow-sm">
-            <Zap className="size-5 fill-white" />
-          </div>
-          <div className="leading-tight">
-            <p className="text-[15px] font-semibold tracking-tight text-white">
-              WattWise
-            </p>
-            <p className="text-xs text-zinc-300">Energy Intelligence</p>
+        {/* Brand Pill */}
+        <div className="relative z-10 flex items-center">
+          <div className="inline-flex items-center gap-3 rounded-xl border border-white/15 bg-[#09090B]/65 px-3.5 py-2 backdrop-blur-md">
+            <div className="flex size-9 items-center justify-center rounded-lg bg-[#059669] text-white shadow-xs">
+              <Zap className="size-4.5 fill-white" />
+            </div>
+            <div className="leading-tight">
+              <p className="text-[15px] font-semibold tracking-tight text-white">
+                WattWise
+              </p>
+              <p className="text-xs text-zinc-200/85">Energy Intelligence</p>
+            </div>
           </div>
         </div>
 
-        <div className="relative z-10 my-10 max-w-lg space-y-8 lg:my-12">
-          <div className="space-y-4">
-            <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white sm:text-[42px] sm:leading-[1.12]">
+        {/* Lower Copy & Architecture Spec */}
+        <div className="relative z-10 mt-28 max-w-lg space-y-6 lg:mt-auto lg:pt-24">
+          <div className="space-y-3">
+            <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-[40px] sm:leading-[1.12]">
               Pantau dan hemat energi pabrik Anda secara real-time
             </h1>
-            <p className="text-sm leading-relaxed text-zinc-200/90 sm:text-[15px]">
+            <p className="text-sm leading-relaxed text-zinc-100/95 drop-shadow-[0_1px_6px_rgba(0,0,0,0.6)] sm:text-[15px]">
               Satu ruang kerja untuk memantau beban listrik mesin, mendeteksi
               pemborosan idle, dan menindaklanjuti rekomendasi audit energi.
             </p>
           </div>
 
-          {/* Crisp Hairline-Divided 3-Stage Architecture Spec */}
-          <dl className="divide-y divide-white/15 border-y border-white/15 bg-[#09090B]/40 px-4 backdrop-blur-[2px]">
+          <dl className="divide-y divide-white/15 rounded-xl border border-white/15 bg-[#09090B]/72 px-4 backdrop-blur-md">
             {PIPELINE_STAGES.map((stage) => (
               <div
                 key={stage.step}
-                className="grid grid-cols-1 gap-1 py-4 sm:grid-cols-[120px_1fr] sm:gap-4"
+                className="grid grid-cols-1 gap-1 py-3.5 sm:grid-cols-[120px_1fr] sm:gap-4"
               >
                 <dt>
                   <span className="block text-[13px] font-medium text-white">
@@ -88,20 +86,20 @@ export default function LoginPage() {
                     {stage.metric}
                   </span>
                 </dt>
-                <dd className="text-xs leading-relaxed text-zinc-200/85">
+                <dd className="text-xs leading-relaxed text-zinc-200/90">
                   {stage.detail}
                 </dd>
               </div>
             ))}
           </dl>
-        </div>
 
-        <p className="relative z-10 text-xs text-zinc-400">
-          WattWise Smart Energy Audit · Sentra Furnitur &amp; Manufaktur
-        </p>
+          <p className="pt-1 text-xs text-zinc-300/85">
+            WattWise Smart Energy Audit · Sentra Furnitur &amp; Manufaktur
+          </p>
+        </div>
       </section>
 
-      {/* Right Clean Light Login Surface */}
+      {/* Right Login Surface */}
       <section className="flex items-center justify-center bg-background px-6 py-10 sm:px-12 sm:py-12">
         <div className="w-full max-w-[390px]">
           <LoginForm />
