@@ -50,6 +50,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
+import { UserBlobatar } from "@/components/ui/user-blobatar";
 import type { DateRangeKey } from "@/lib/mock-dashboard-data";
 
 export interface AppShellProps {
@@ -101,13 +102,6 @@ const RANGE_LABELS: Record<DateRangeKey, string> = {
   today: "Hari Ini",
 };
 
-function getInitials(name: string): string {
-  const parts = name.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "WW";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return `${parts[0][0]}${parts[1][0]}`.toUpperCase();
-}
-
 export function AppShell({
   title,
   section = "Menu Utama",
@@ -130,6 +124,7 @@ export function AppShell({
   const [mobileOpen, setMobileOpen] = React.useState(false);
   const [liveMeta, setLiveMeta] = React.useState<{
     workshopName: string;
+    username: string;
     ownerName: string;
     ownerRole: string;
     onlineDevices: number;
@@ -146,6 +141,7 @@ export function AppShell({
         setLiveMeta((prev) => ({
           workshopName:
             me.user?.workshopName ?? prev?.workshopName ?? workshopName,
+          username: me.user?.username ?? prev?.username ?? "owner",
           ownerName: me.user?.fullName ?? prev?.ownerName ?? ownerName,
           ownerRole:
             me.user?.role === "TECHNICIAN"
@@ -170,6 +166,7 @@ export function AppShell({
             : 0;
           setLiveMeta((prev) => ({
             workshopName: prev?.workshopName ?? workshopName,
+            username: prev?.username ?? "owner",
             ownerName: prev?.ownerName ?? ownerName,
             ownerRole: prev?.ownerRole ?? ownerRole,
             onlineDevices: prev?.onlineDevices ?? onlineDevices,
@@ -193,6 +190,7 @@ export function AppShell({
   ]);
 
   const effectiveWorkshop = liveMeta?.workshopName ?? workshopName;
+  const effectiveUsername = liveMeta?.username ?? "owner";
   const effectiveOwner = liveMeta?.ownerName ?? ownerName;
   const effectiveRole = liveMeta?.ownerRole ?? ownerRole;
   const effectiveOnline = liveMeta?.onlineDevices ?? onlineDevices;
@@ -464,9 +462,12 @@ export function AppShell({
                 }
               >
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-[#ECFDF5] text-xs font-semibold text-[#047857] dark:bg-emerald-950 dark:text-emerald-300">
-                    {getInitials(effectiveWorkshop)}
-                  </div>
+                  <UserBlobatar
+                    name={`wattwise-${effectiveUsername}`}
+                    size={32}
+                    shape="circle"
+                    title={`${effectiveOwner} (${effectiveRole})`}
+                  />
                   {!collapsed && (
                     <div className="min-w-0 leading-tight">
                       <p className="truncate text-xs font-semibold text-foreground">
@@ -763,10 +764,15 @@ export function AppShell({
 
             <Link
               href="/settings"
-              className="hidden size-9 items-center justify-center rounded-full bg-[#ECFDF5] text-xs font-semibold text-[#047857] ring-1 ring-emerald-600/20 transition-colors hover:bg-emerald-100 sm:flex dark:bg-emerald-950 dark:text-emerald-300 dark:ring-emerald-400/25"
+              className="hidden rounded-full transition-transform hover:scale-[1.03] sm:inline-flex"
               title={`${effectiveOwner} · Pengaturan`}
             >
-              {getInitials(effectiveOwner)}
+              <UserBlobatar
+                name={`wattwise-${effectiveUsername}`}
+                size={36}
+                shape="circle"
+                title={`${effectiveOwner} · Pengaturan`}
+              />
             </Link>
           </div>
         </header>
