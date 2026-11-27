@@ -1,7 +1,10 @@
 import { NextResponse } from "next/server";
 import { z } from "zod";
+import { answerEnergyQuestionWithAi } from "@/lib/ai/advisor";
+import { computePeakIdleWindows } from "@/lib/audit/peak-idle";
 import { formatTelegramSummaryReport } from "@/lib/audit/recommendations";
 import { getDashboardOverview } from "@/lib/dashboard/service";
+import { db } from "@/lib/db";
 import {
   calculateWhatIfSavings,
   formatRupiah,
@@ -21,6 +24,28 @@ const telegramUpdateSchema = z.object({
     .optional(),
 });
 
+async function loadPeakIdleForWorkshop(workshopId: string) {
+  try {
+    const since = new Date(Date.now() - 30 * 86_400_000);
+    const sessions = await db.machineStateSession.findMany({
+      where: {
+        machine: { workshopId },
+        status: "IDLE",
+        startedAt: { gte: since },
+      },
+      select: {
+        machineId: true,
+        status: true,
+        startedAt: true,
+        durationSec: true,
+      },
+    });
+    return computePeakIdleWindows(sessions);
+  } catch {
+    return { byMachineId: {}, workshopPeakWindowLabel: null };
+  }
+}
+
 export async function POST(request: Request) {
   const expectedSecret = process.env.TELEGRAM_WEBHOOK_SECRET?.trim();
   if (expectedSecret) {
@@ -28,7 +53,10 @@ export async function POST(request: Request) {
       "x-telegram-bot-api-secret-token"
     );
     if (incomingSecret !== expectedSecret) {
-      return NextResponse.json({ error: "Unauthorized webhook" }, { status: 401 });
+      return NextResponse.json(
+        { error: "Unauthorized webhook" },
+        { status: 401 }
+      );
     }
   }
 
@@ -39,10 +67,15 @@ export async function POST(request: Request) {
   }
 
   const chatId = String(parsed.data.message.chat.id);
-  const command = parsed.data.message.text.trim().split(/\s+/)[0].toLowerCase();
+  const fullText = parsed.data.message.text.trim();
+  const firstToken = fullText.split(/\s+/)[0].toLowerCase();
+  const command = firstToken.startsWith("/")
+    ? firstToken.split("@")[0]
+    : "free_text";
 
   const overview = await getDashboardOverview("month");
   let replyText = "";
+  let aiSource: "AI_LLM" | "AI_RULE" = "AI_RULE";
 
   if (command === "/status") {
     const lines = overview.machines.map(
@@ -63,10 +96,12 @@ export async function POST(request: Request) {
       `/start — Ringkasan penghematan energi bulan ini`,
       `/status — Cek status mesin real-time (Working/Idle/Off)`,
       `/laporan — Laporan potensi kerugian idle & saran tindakan`,
+      `/tanya <pertanyaan> — Tanya bebas ke WattWise AI Advisor`,
       `/help — Tampilkan daftar perintah`,
+      ``,
+      `💬 Atau langsung kirim pertanyaan biasa (contoh: _"Mesin mana yang paling boros minggu ini?"_)!`,
     ].join("\n");
-  } else {
-    // /start atau /laporan (sesuai Lampiran 5 Gambar 5.3)
+  } else if (command === "/start" || command === "/laporan") {
     const sorted = [...overview.machines].sort(
       (a, b) => b.idleLossMonthIdr - a.idleLossMonthIdr
     );
@@ -89,6 +124,28 @@ export async function POST(request: Request) {
     if (command === "/laporan") {
       replyText += `\n\n📊 Efisiensi ISO 14955-5: *${overview.metrics.operationalEfficiencyPct}%* (${overview.metrics.efficiencyBadge})\n⚡ Total Energi: *${overview.metrics.totalEnergyKwh} kWh* (${formatRupiah(overview.metrics.totalEnergyCostIdr)})`;
     }
+  } else {
+    // Pertanyaan bebas atau `/tanya <pertanyaan>` -> Generative AI Advisor berbasis data live
+    const question =
+      command === "/tanya"
+        ? fullText.replace(/^\/tanya(?:@\S+)?\s*/i, "").trim() ||
+          "Berikan ringkasan mesin paling boros dan saran penghematan utama bulan ini."
+        : fullText;
+
+    const peakAnalysis =
+      overview.dataSource === "database"
+        ? await loadPeakIdleForWorkshop(overview.workshop.id)
+        : { byMachineId: {}, workshopPeakWindowLabel: null };
+
+    const aiReply = await answerEnergyQuestionWithAi({
+      question,
+      overview,
+      peakIdleByMachineId: peakAnalysis.byMachineId,
+      workshopPeakWindowLabel: peakAnalysis.workshopPeakWindowLabel,
+    });
+
+    replyText = aiReply.answerText;
+    aiSource = aiReply.source;
   }
 
   const sendResult = await sendTelegramMessage({ chatId, text: replyText });
@@ -97,6 +154,7 @@ export async function POST(request: Request) {
     ok: sendResult.ok,
     mode: sendResult.mode,
     command,
+    aiSource,
     replyPreview: replyText,
   });
 }
