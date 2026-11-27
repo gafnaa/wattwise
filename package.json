@@ -12,6 +12,7 @@
     "test": "tsx --test src/lib/__tests__/*.test.ts",
     "ml:train": "tsx ml/train-baseline.ts",
     "iot:simulate": "tsx scripts/simulate-esp32.ts",
+    "telegram:poll": "tsx scripts/telegram-poll.ts",
     "postinstall": "prisma generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
