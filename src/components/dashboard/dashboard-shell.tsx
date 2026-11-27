@@ -281,15 +281,15 @@ export function DashboardShell() {
         </Skeleton>
 
         {/* Row 2: Energy Consumption Chart + Live Machine Status Donut */}
-        <section className="grid grid-cols-1 gap-4 xl:grid-cols-12">
-          <div className="min-w-0 xl:col-span-8">
+        <section className="grid grid-cols-1 items-stretch gap-4 xl:grid-cols-12">
+          <div className="h-full min-w-0 xl:col-span-8">
             <EnergyConsumptionCard
               machines={overview.machines}
               totalEnergyKwh={overview.metrics.totalEnergyKwh}
               tariffIdrPerKwh={overview.workshop.tariffIdrPerKwh}
             />
           </div>
-          <div className="min-w-0 xl:col-span-4">
+          <div className="h-full min-w-0 xl:col-span-4">
             <MachineStatusDonutCard
               machines={overview.machines}
               metrics={overview.metrics}

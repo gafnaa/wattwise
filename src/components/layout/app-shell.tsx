@@ -285,14 +285,13 @@ export function AppShell({
 
   return (
     <div className="flex min-h-screen bg-background text-foreground">
-      {/* Desktop Sidebar — pixel-locked icon rail at x=34px for butter-smooth width animation */}
+      {/* Desktop Sidebar — sticky directly on <aside> so overflow-hidden never breaks stickiness */}
       <aside
-        className={`hidden shrink-0 overflow-hidden border-r border-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] lg:block ${
+        className={`sticky top-0 hidden h-screen shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar transition-[width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-[width] lg:flex ${
           collapsed ? "w-[68px]" : "w-[256px]"
         }`}
       >
-        <div className="sticky top-0 flex h-screen flex-col overflow-hidden">
-          {/* Brand Row — pure brand mark, toggle lives outside sidebar in top header */}
+        {/* Brand Row — pure brand mark, toggle lives outside sidebar in top header */}
           <div className="flex h-16 shrink-0 items-center border-b border-border/60 px-[18px]">
             <Link
               href="/dashboard"
@@ -472,7 +471,6 @@ export function AppShell({
               </DropdownMenuContent>
             </DropdownMenu>
           </div>
-        </div>
       </aside>
 
       {/* Mobile Full Drawer */}
