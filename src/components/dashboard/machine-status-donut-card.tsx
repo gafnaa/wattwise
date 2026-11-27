@@ -41,7 +41,7 @@ export function MachineStatusDonutCard({
   ];
 
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
           Status Mesin

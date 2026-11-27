@@ -211,7 +211,7 @@ export function EnergyConsumptionCard({
     comparePeriod && (seriesSource === "demo" || hasDbPrevious);
 
   return (
-    <div className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
+    <div className="flex h-full min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
       <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
@@ -306,9 +306,10 @@ export function EnergyConsumptionCard({
         </label>
       </div>
 
-      <div className="mt-4 h-[230px] w-full min-w-0 sm:h-[265px]">
-        {isClient ? (
-          <ResponsiveContainer width="100%" height="100%">
+      <div className="relative mt-4 min-h-[260px] w-full min-w-0 flex-1 sm:min-h-[300px]">
+        <div className="absolute inset-0">
+          {isClient ? (
+            <ResponsiveContainer width="100%" height="100%">
             <AreaChart
               data={series}
               margin={{ top: 10, right: 8, left: -18, bottom: 0 }}
@@ -412,9 +413,10 @@ export function EnergyConsumptionCard({
               />
             </AreaChart>
           </ResponsiveContainer>
-        ) : (
-          <div className="h-full w-full rounded-lg bg-muted/40" />
-        )}
+          ) : (
+            <div className="h-full w-full rounded-lg bg-muted/40" />
+          )}
+        </div>
       </div>
     </div>
   );
