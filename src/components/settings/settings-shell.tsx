@@ -16,6 +16,7 @@ import { AppShell } from "@/components/layout/app-shell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { UserBlobatar } from "@/components/ui/user-blobatar";
 import { StatusPill } from "@/components/ui/wattwise-badges";
 
 type SettingsTab = "profil" | "notifikasi" | "pengguna" | "integrasi";
@@ -385,11 +386,19 @@ export function SettingsShell() {
                   key={u.username}
                   className="flex flex-wrap items-center justify-between gap-3 py-3.5"
                 >
-                  <div>
-                    <p className="font-semibold text-foreground">{u.name}</p>
-                    <p className="mt-0.5 text-[11px] text-muted-foreground">
-                      @{u.username} · {u.desc}
-                    </p>
+                  <div className="flex items-center gap-3">
+                    <UserBlobatar
+                      name={`wattwise-${u.username}`}
+                      size={36}
+                      shape="circle"
+                      title={u.name}
+                    />
+                    <div>
+                      <p className="font-semibold text-foreground">{u.name}</p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        @{u.username} · {u.desc}
+                      </p>
+                    </div>
                   </div>
                   <StatusPill
                     label={u.role === "OWNER" ? "Pemilik" : "Teknisi"}
