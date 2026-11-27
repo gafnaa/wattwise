@@ -2,27 +2,6 @@ import { Zap } from "lucide-react";
 import { DitherBackground } from "@/components/auth/dither-background";
 import { LoginForm } from "@/components/auth/login-form";
 
-const PIPELINE_STAGES = [
-  {
-    step: "Sensor IoT",
-    metric: "5 detik",
-    detail:
-      "Telemetri daya mesin prioritas (ESP32 + PZEM-004T) dan agregasi Virtual CT.",
-  },
-  {
-    step: "Random Forest",
-    metric: "ISO 14955-5",
-    detail:
-      "Klasifikasi otomatis status Working, Idle, Start-up, dan Off secara real-time.",
-  },
-  {
-    step: "AI Advisor",
-    metric: "Telegram & Web",
-    detail:
-      "Rekomendasi penghematan berbasis jam rawan idle dan tanya-jawab data bengkel.",
-  },
-] as const;
-
 export default function LoginPage() {
   return (
     <div className="grid min-h-screen grid-cols-1 lg:grid-cols-2">
@@ -42,7 +21,7 @@ export default function LoginPage() {
         {/* Targeted Bottom Scrim ONLY behind text — keeps sunlit windows, greenery & CNC vibrant */}
         <div
           aria-hidden="true"
-          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B]/92 via-[#09090B]/48 via-45% to-transparent"
+          className="pointer-events-none absolute inset-0 bg-gradient-to-t from-[#09090B]/88 via-[#09090B]/40 via-38% to-transparent"
         />
 
         {/* Brand Pill */}
@@ -60,8 +39,8 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {/* Lower Copy & Architecture Spec */}
-        <div className="relative z-10 mt-28 max-w-lg space-y-6 lg:mt-auto lg:pt-24">
+        {/* Lower Editorial Copy */}
+        <div className="relative z-10 mt-36 max-w-lg space-y-5 lg:mt-auto lg:pt-32">
           <div className="space-y-3">
             <h1 className="text-3xl font-semibold tracking-[-0.025em] text-white drop-shadow-[0_2px_12px_rgba(0,0,0,0.65)] sm:text-[40px] sm:leading-[1.12]">
               Pantau dan hemat energi pabrik Anda secara real-time
@@ -71,27 +50,6 @@ export default function LoginPage() {
               pemborosan idle, dan menindaklanjuti rekomendasi audit energi.
             </p>
           </div>
-
-          <dl className="divide-y divide-white/15 rounded-xl border border-white/15 bg-[#09090B]/72 px-4 backdrop-blur-md">
-            {PIPELINE_STAGES.map((stage) => (
-              <div
-                key={stage.step}
-                className="grid grid-cols-1 gap-1 py-3.5 sm:grid-cols-[120px_1fr] sm:gap-4"
-              >
-                <dt>
-                  <span className="block text-[13px] font-medium text-white">
-                    {stage.step}
-                  </span>
-                  <span className="font-mono text-xs text-[#34D399]">
-                    {stage.metric}
-                  </span>
-                </dt>
-                <dd className="text-xs leading-relaxed text-zinc-200/90">
-                  {stage.detail}
-                </dd>
-              </div>
-            ))}
-          </dl>
 
           <p className="pt-1 text-xs text-zinc-300/85">
             WattWise Smart Energy Audit · Sentra Furnitur &amp; Manufaktur
