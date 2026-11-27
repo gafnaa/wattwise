@@ -78,7 +78,6 @@ function buildEnergySeries(params: {
     });
   }
 
-  // Harian (14 hari terakhir, Minggu turun karena bengkel libur)
   const dailyFactors = [
     1.05, 1.11, 1.16, 0.86, 0.36, 1.14, 1.18, 1.15, 1.07, 1.22, 1.04, 0.51,
     1.12, 1.08,
@@ -134,6 +133,10 @@ function buildEnergySeries(params: {
   });
 }
 
+function subscribeNoop() {
+  return () => {};
+}
+
 export function EnergyConsumptionCard({
   machines,
   totalEnergyKwh,
@@ -143,6 +146,11 @@ export function EnergyConsumptionCard({
   totalEnergyKwh: number;
   tariffIdrPerKwh: number;
 }) {
+  const isClient = React.useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
   const [granularity, setGranularity] = React.useState<Granularity>("daily");
   const [selectedMachine, setSelectedMachine] = React.useState<string>("ALL");
   const [comparePeriod, setComparePeriod] = React.useState<boolean>(true);
@@ -170,11 +178,10 @@ export function EnergyConsumptionCard({
   );
 
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card p-5">
-      {/* Top Header */}
-      <div className="flex flex-wrap items-start justify-between gap-3">
-        <div>
-          <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-start">
+        <div className="min-w-0">
+          <div className="flex flex-wrap items-center gap-2">
             <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
               Konsumsi Energi
             </h2>
@@ -195,7 +202,6 @@ export function EnergyConsumptionCard({
           </p>
         </div>
 
-        {/* Right Controls */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="inline-flex rounded-lg border border-border bg-muted/50 p-0.5 text-xs">
             {(
@@ -224,8 +230,8 @@ export function EnergyConsumptionCard({
             value={selectedMachine}
             onValueChange={(v) => setSelectedMachine(v ?? "ALL")}
           >
-            <SelectTrigger className="h-8 w-[150px] rounded-lg border-border bg-card text-xs font-medium">
-              <Cpu className="mr-1.5 size-3.5 text-muted-foreground" />
+            <SelectTrigger className="h-8 w-[144px] rounded-lg border-border bg-card text-xs font-medium">
+              <Cpu className="mr-1.5 size-3.5 shrink-0 text-muted-foreground" />
               <SelectValue />
             </SelectTrigger>
             <SelectContent>
@@ -240,9 +246,8 @@ export function EnergyConsumptionCard({
         </div>
       </div>
 
-      {/* Legend + Compare Toggle */}
       <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs">
-        <div className="flex items-center gap-4 text-muted-foreground">
+        <div className="flex flex-wrap items-center gap-4 text-muted-foreground">
           <span className="inline-flex items-center gap-1.5">
             <span className="h-0.5 w-3.5 rounded-full bg-[#059669]" />
             <span>Periode ini</span>
@@ -264,98 +269,108 @@ export function EnergyConsumptionCard({
         </label>
       </div>
 
-      {/* Chart */}
-      <div className="mt-4 h-[265px] w-full">
-        <ResponsiveContainer width="100%" height="100%">
-          <AreaChart
-            data={series}
-            margin={{ top: 10, right: 10, left: -16, bottom: 0 }}
-          >
-            <defs>
-              <linearGradient id="wwEmeraldFill" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#059669" stopOpacity={0.18} />
-                <stop offset="95%" stopColor="#059669" stopOpacity={0.01} />
-              </linearGradient>
-            </defs>
-            <CartesianGrid
-              strokeDasharray="3 3"
-              vertical={false}
-              stroke="var(--border)"
-            />
-            <XAxis
-              dataKey="label"
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-              dy={6}
-            />
-            <YAxis
-              axisLine={false}
-              tickLine={false}
-              tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
-            />
-            <Tooltip
-              content={({ active, payload }) => {
-                if (!active || !payload?.length) return null;
-                const row = payload[0]?.payload as ChartPoint;
-                return (
-                  <div className="min-w-[190px] rounded-xl border border-border bg-popover p-3 text-xs shadow-lg">
-                    <p className="font-semibold text-foreground">
-                      {row.fullDate}
-                    </p>
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center justify-between gap-4">
-                        <span className="flex items-center gap-1.5 text-muted-foreground">
-                          <span className="size-1.5 rounded-full bg-[#059669]" />
-                          Periode ini
-                        </span>
-                        <span className="font-mono font-medium text-foreground">
-                          {row.currentKwh.toLocaleString("id-ID")} kWh
-                        </span>
-                      </div>
-                      {comparePeriod && (
+      <div className="mt-4 h-[230px] w-full min-w-0 sm:h-[265px]">
+        {isClient ? (
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart
+              data={series}
+              margin={{ top: 10, right: 8, left: -18, bottom: 0 }}
+            >
+              <defs>
+                <linearGradient id="wwEmeraldFill" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%" stopColor="#059669" stopOpacity={0.16} />
+                  <stop offset="95%" stopColor="#059669" stopOpacity={0.01} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid
+                strokeDasharray="3 3"
+                vertical={false}
+                stroke="var(--border)"
+              />
+              <XAxis
+                dataKey="label"
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+                dy={6}
+              />
+              <YAxis
+                axisLine={false}
+                tickLine={false}
+                tick={{ fill: "var(--muted-foreground)", fontSize: 11 }}
+              />
+              <Tooltip
+                content={({ active, payload }) => {
+                  if (!active || !payload?.length) return null;
+                  const row = payload[0]?.payload as ChartPoint;
+                  return (
+                    <div className="min-w-[190px] rounded-xl border border-border bg-popover p-3 text-xs shadow-lg">
+                      <p className="font-semibold text-foreground">
+                        {row.fullDate}
+                      </p>
+                      <div className="mt-2 space-y-1">
                         <div className="flex items-center justify-between gap-4">
                           <span className="flex items-center gap-1.5 text-muted-foreground">
-                            <span className="size-1.5 rounded-full bg-zinc-400" />
-                            Sebelumnya
+                            <span className="size-1.5 rounded-full bg-[#059669]" />
+                            Periode ini
                           </span>
-                          <span className="font-mono text-muted-foreground">
-                            {row.previousKwh.toLocaleString("id-ID")} kWh
+                          <span className="font-mono font-medium text-foreground">
+                            {row.currentKwh.toLocaleString("id-ID")} kWh
                           </span>
                         </div>
-                      )}
-                      <div className="flex items-center justify-between gap-4 border-t border-border pt-1.5">
-                        <span className="text-muted-foreground">Est. biaya</span>
-                        <span className="font-mono font-semibold text-foreground">
-                          {formatRupiah(row.estCostIdr)}
-                        </span>
+                        {comparePeriod && (
+                          <div className="flex items-center justify-between gap-4">
+                            <span className="flex items-center gap-1.5 text-muted-foreground">
+                              <span className="size-1.5 rounded-full bg-zinc-400" />
+                              Sebelumnya
+                            </span>
+                            <span className="font-mono text-muted-foreground">
+                              {row.previousKwh.toLocaleString("id-ID")} kWh
+                            </span>
+                          </div>
+                        )}
+                        <div className="flex items-center justify-between gap-4 border-t border-border pt-1.5">
+                          <span className="text-muted-foreground">
+                            Est. biaya
+                          </span>
+                          <span className="font-mono font-semibold text-foreground">
+                            {formatRupiah(row.estCostIdr)}
+                          </span>
+                        </div>
                       </div>
                     </div>
-                  </div>
-                );
-              }}
-            />
-            {comparePeriod && (
+                  );
+                }}
+              />
+              {comparePeriod && (
+                <Area
+                  type="monotone"
+                  dataKey="previousKwh"
+                  stroke="#A1A1AA"
+                  strokeWidth={1.5}
+                  strokeDasharray="4 4"
+                  fill="none"
+                  dot={false}
+                />
+              )}
               <Area
                 type="monotone"
-                dataKey="previousKwh"
-                stroke="#A1A1AA"
-                strokeWidth={1.5}
-                strokeDasharray="4 4"
-                fill="none"
-                dot={false}
+                dataKey="currentKwh"
+                stroke="#059669"
+                strokeWidth={2}
+                fill="url(#wwEmeraldFill)"
+                activeDot={{
+                  r: 5,
+                  fill: "#059669",
+                  stroke: "#ffffff",
+                  strokeWidth: 2,
+                }}
               />
-            )}
-            <Area
-              type="monotone"
-              dataKey="currentKwh"
-              stroke="#059669"
-              strokeWidth={2}
-              fill="url(#wwEmeraldFill)"
-              activeDot={{ r: 5, fill: "#059669", stroke: "#ffffff", strokeWidth: 2 }}
-            />
-          </AreaChart>
-        </ResponsiveContainer>
+            </AreaChart>
+          </ResponsiveContainer>
+        ) : (
+          <div className="h-full w-full rounded-lg bg-muted/40" />
+        )}
       </div>
     </div>
   );

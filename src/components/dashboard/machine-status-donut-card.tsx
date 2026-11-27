@@ -9,6 +9,10 @@ import {
 } from "@/components/ui/wattwise-badges";
 import type { MachineCardData, PeriodMetrics } from "@/lib/mock-dashboard-data";
 
+function subscribeNoop() {
+  return () => {};
+}
+
 export function MachineStatusDonutCard({
   machines,
   metrics,
@@ -16,6 +20,11 @@ export function MachineStatusDonutCard({
   machines: MachineCardData[];
   metrics: PeriodMetrics;
 }) {
+  const isClient = React.useSyncExternalStore(
+    subscribeNoop,
+    () => true,
+    () => false
+  );
   const workingPct =
     metrics.isoDistribution.find((d) => d.key === "working")?.pct ?? 52;
   const idlePct =
@@ -32,8 +41,8 @@ export function MachineStatusDonutCard({
   ];
 
   return (
-    <div className="flex flex-col rounded-xl border border-border bg-card p-5">
-      <div className="flex items-center gap-2">
+    <div className="flex min-w-0 flex-col rounded-xl border border-border bg-card p-4 sm:p-5">
+      <div className="flex flex-wrap items-center gap-2">
         <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
           Status Mesin
         </h2>
@@ -44,34 +53,38 @@ export function MachineStatusDonutCard({
       </p>
 
       {/* Donut + Legend */}
-      <div className="mt-4 flex items-center gap-4">
+      <div className="mt-4 flex flex-col items-center gap-4 sm:flex-row">
         <div className="relative h-[126px] w-[126px] shrink-0">
-          <ResponsiveContainer width="100%" height="100%">
-            <PieChart>
-              <Pie
-                data={slices}
-                dataKey="value"
-                nameKey="key"
-                innerRadius={40}
-                outerRadius={58}
-                paddingAngle={2}
-                strokeWidth={0}
-              >
-                {slices.map((s) => (
-                  <Cell key={s.key} fill={s.color} />
-                ))}
-              </Pie>
-            </PieChart>
-          </ResponsiveContainer>
+          {isClient ? (
+            <ResponsiveContainer width="100%" height="100%">
+              <PieChart>
+                <Pie
+                  data={slices}
+                  dataKey="value"
+                  nameKey="key"
+                  innerRadius={40}
+                  outerRadius={58}
+                  paddingAngle={2}
+                  strokeWidth={0}
+                >
+                  {slices.map((s) => (
+                    <Cell key={s.key} fill={s.color} />
+                  ))}
+                </Pie>
+              </PieChart>
+            </ResponsiveContainer>
+          ) : (
+            <div className="size-full rounded-full border-[14px] border-muted" />
+          )}
           <div className="pointer-events-none absolute inset-0 flex flex-col items-center justify-center">
             <span className="text-lg font-semibold text-foreground tabular-nums">
               {workingPct}%
             </span>
-            <span className="text-[10.5px] text-muted-foreground">Working</span>
+            <span className="text-[11px] text-muted-foreground">Working</span>
           </div>
         </div>
 
-        <div className="flex-1 space-y-2 text-xs">
+        <div className="w-full flex-1 space-y-2 text-xs">
           {slices.map((s) => (
             <div key={s.key} className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-2 text-muted-foreground">
@@ -98,10 +111,10 @@ export function MachineStatusDonutCard({
               key={m.id}
               className="flex items-center justify-between gap-2 py-2 text-xs"
             >
-              <span className="truncate font-medium text-foreground">
+              <span className="min-w-0 truncate font-medium text-foreground">
                 {m.name}
               </span>
-              <div className="flex shrink-0 items-center gap-2.5">
+              <div className="flex shrink-0 items-center gap-2">
                 <span className="font-mono text-muted-foreground tabular-nums">
                   {m.currentPowerW.toLocaleString("id-ID")} W
                 </span>

@@ -15,7 +15,9 @@ import {
 import { StatusPill } from "@/components/ui/wattwise-badges";
 import type { DashboardOverviewResponse } from "@/lib/dashboard/service";
 import {
+  calculateWhatIfSavings,
   INITIAL_MACHINES,
+  PERIOD_METRICS,
   WORKSHOP_INFO,
   type DateRangeKey,
 } from "@/lib/mock-dashboard-data";
@@ -31,54 +33,67 @@ interface ReportRecord {
   formatLabel: string;
 }
 
-const INITIAL_REPORTS: ReportRecord[] = [
-  {
-    id: "rep-1",
-    title: "Laporan Mingguan Konsumsi Energi",
-    subtitle: "Otomatis · CSV · 6 mesin",
-    status: "READY",
-    period: "7 hari terakhir",
-    createdAt: "Hari ini, 06.00",
-    range: "week",
-    formatLabel: "Unduh CSV",
-  },
-  {
-    id: "rep-2",
-    title: "Laporan Audit Bulanan ISO 14955-5",
-    subtitle: "Otomatis · CSV · 6 mesin",
-    status: "READY",
-    period: "30 hari terakhir",
-    createdAt: "1 Nov, 06.00",
-    range: "month",
-    formatLabel: "Unduh CSV",
-  },
-  {
-    id: "rep-3",
-    title: "Ringkasan Operasional Hari Ini",
-    subtitle: "Manual · CSV · 6 mesin",
-    status: "READY",
-    period: "Hari ini",
-    createdAt: "Baru diperbarui",
-    range: "today",
-    formatLabel: "Unduh CSV",
-  },
-  {
-    id: "rep-4",
-    title: "Laporan Bulanan Periode Berikutnya",
-    subtitle: "Otomatis · CSV + Telegram · 6 mesin",
-    status: "SCHEDULED",
-    period: "Bulan depan",
-    createdAt: "Terjadwal Senin 06.00",
-    range: "month",
-    formatLabel: "Unduh Pratinjau",
-  },
-];
+function buildDefaultReports(machineCount: number): ReportRecord[] {
+  return [
+    {
+      id: "rep-1",
+      title: "Laporan Mingguan Konsumsi Energi",
+      subtitle: `Otomatis · CSV · ${machineCount} mesin`,
+      status: "READY",
+      period: "7 hari terakhir",
+      createdAt: "Hari ini, 06.00",
+      range: "week",
+      formatLabel: "Unduh CSV",
+    },
+    {
+      id: "rep-2",
+      title: "Laporan Audit Bulanan ISO 14955-5",
+      subtitle: `Otomatis · CSV · ${machineCount} mesin`,
+      status: "READY",
+      period: "30 hari terakhir",
+      createdAt: "1 Nov, 06.00",
+      range: "month",
+      formatLabel: "Unduh CSV",
+    },
+    {
+      id: "rep-3",
+      title: "Ringkasan Operasional Hari Ini",
+      subtitle: `Manual · CSV · ${machineCount} mesin`,
+      status: "READY",
+      period: "Hari ini",
+      createdAt: "Baru diperbarui",
+      range: "today",
+      formatLabel: "Unduh CSV",
+    },
+    {
+      id: "rep-4",
+      title: "Laporan Bulanan Periode Berikutnya",
+      subtitle: `Otomatis · CSV + Telegram · ${machineCount} mesin`,
+      status: "SCHEDULED",
+      period: "Bulan depan",
+      createdAt: "Terjadwal Senin 06.00",
+      range: "month",
+      formatLabel: "Unduh Pratinjau",
+    },
+  ];
+}
 
 export function ReportsPageClient() {
-  const [reports, setReports] = React.useState<ReportRecord[]>(INITIAL_REPORTS);
+  const [reports, setReports] = React.useState<ReportRecord[]>(() =>
+    buildDefaultReports(INITIAL_MACHINES.length)
+  );
   const [machines, setMachines] = React.useState(INITIAL_MACHINES);
   const [workshopName, setWorkshopName] = React.useState<string>(
     WORKSHOP_INFO.name
+  );
+  const [tariffIdr, setTariffIdr] = React.useState<number>(
+    WORKSHOP_INFO.tariffIdrPerKwh
+  );
+  const [workingDays, setWorkingDays] = React.useState<number>(
+    WORKSHOP_INFO.workingDaysPerMonth
+  );
+  const [idleLossIdr, setIdleLossIdr] = React.useState<number>(
+    PERIOD_METRICS.month.idleLossIdr
   );
   const [dataSource, setDataSource] = React.useState<"database" | "demo">(
     "database"
@@ -98,7 +113,11 @@ export function ReportsPageClient() {
         if (!active || !d) return;
         setMachines(d.machines);
         setWorkshopName(d.workshop.name);
+        setTariffIdr(d.workshop.tariffIdrPerKwh);
+        setWorkingDays(d.workshop.workingDaysPerMonth);
+        setIdleLossIdr(d.metrics.idleLossIdr);
         setDataSource(d.dataSource);
+        setReports(buildDefaultReports(d.machines.length));
       })
       .catch(() => null);
     return () => {
@@ -123,7 +142,8 @@ export function ReportsPageClient() {
       const scopeLabel =
         selectedScope === "ALL"
           ? `Semua mesin (${machines.length})`
-          : machines.find((m) => m.code === selectedScope)?.name ?? selectedScope;
+          : machines.find((m) => m.code === selectedScope)?.name ??
+            selectedScope;
       const periodLabel =
         selectedRange === "today"
           ? "Hari ini"
@@ -147,20 +167,27 @@ export function ReportsPageClient() {
       setReports((prev) => [newReport, ...prev]);
 
       if (selectedFormat === "telegram") {
+        const whatIf30 = calculateWhatIfSavings({
+          idleReductionMinPerDay: 30,
+          startupReductionPct: 35,
+          machines,
+          tariffIdrPerKwh: tariffIdr,
+          workingDaysPerMonth: workingDays,
+        });
         const res = await fetch("/api/telegram/send-report", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             idleReductionMinPerDay: 30,
             startupReductionPct: 35,
-            projectedMonthlySavingIdr: 486166,
-            currentIdleLossIdr: 227658,
+            projectedMonthlySavingIdr: whatIf30.totalSavingIdr,
+            currentIdleLossIdr: idleLossIdr,
           }),
         });
         const j = (await res.json()) as { ok?: boolean };
         setStatusMessage(
           j.ok
-            ? "Laporan berhasil dikirim langsung ke Telegram Bot!"
+            ? "Laporan berhasil dikirim langsung ke @wattwise_smart_bot."
             : "Gagal mengirim laporan ke Telegram."
         );
       } else {
@@ -182,16 +209,16 @@ export function ReportsPageClient() {
       dataSource={dataSource}
       workshopName={workshopName}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Header */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Laporan
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
-              Laporan konsumsi energi otomatis dan manual · Format CSV Audit &
-              Telegram
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
+              Laporan konsumsi energi otomatis dan manual · Format CSV Audit
+              &amp; Telegram
             </p>
           </div>
           <Button
@@ -201,46 +228,84 @@ export function ReportsPageClient() {
             onClick={() =>
               downloadAuditCsv("month", "wattwise-laporan-bulanan.csv")
             }
-            className="h-8 gap-1.5 self-start rounded-lg border-border bg-card text-xs font-medium whitespace-nowrap sm:self-auto"
+            className="h-9 gap-1.5 self-start rounded-lg border-border bg-card px-3.5 text-xs font-medium whitespace-nowrap sm:self-auto"
           >
             <FileDown className="size-3.5" />
             <span>Unduh Laporan Terbaru</span>
           </Button>
         </div>
 
-        {/* 2-Column Layout — Exact Figma 05 · Laporan */}
+        {/* 2-Column Layout */}
         <div className="grid grid-cols-1 gap-5 xl:grid-cols-12">
           {/* Left: Daftar Laporan */}
-          <section className="rounded-xl border border-border bg-card p-5 xl:col-span-8">
+          <section className="min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 xl:col-span-8">
             <div>
-              <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+              <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
                 Daftar Laporan
-              </h3>
+              </h2>
               <p className="mt-0.5 text-xs text-muted-foreground">
                 {reports.length} laporan · laporan otomatis dibuat setiap Senin
                 06.00 WIB
               </p>
             </div>
 
-            <div className="mt-5 overflow-x-auto">
-              <table className="w-full min-w-[540px] text-left text-xs">
+            {/* Mobile stacked cards (<md) */}
+            <div className="mt-4 divide-y divide-border/70 md:hidden">
+              {reports.map((rep) => (
+                <div key={rep.id} className="space-y-2 py-3.5 text-xs">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <p className="font-semibold text-foreground">
+                        {rep.title}
+                      </p>
+                      <p className="mt-0.5 text-xs text-muted-foreground">
+                        {rep.subtitle}
+                      </p>
+                    </div>
+                    <StatusPill
+                      label={rep.status === "READY" ? "Siap" : "Terjadwal"}
+                      tone={rep.status === "READY" ? "green" : "blue"}
+                    />
+                  </div>
+                  <div className="flex items-center justify-between pt-1">
+                    <span className="text-muted-foreground">
+                      {rep.period} ·{" "}
+                      <span className="font-mono">{rep.createdAt}</span>
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        downloadAuditCsv(rep.range, `wattwise-${rep.id}.csv`)
+                      }
+                      className="font-semibold text-[#047857] hover:underline dark:text-emerald-400"
+                    >
+                      {rep.formatLabel}
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Desktop/Tablet table (md+) */}
+            <div className="mt-5 hidden overflow-x-auto md:block">
+              <table className="w-full text-left text-xs">
                 <thead>
-                  <tr className="border-b border-border text-[11px] font-medium text-muted-foreground">
-                    <th className="pb-2.5 pr-4 font-medium">Nama laporan</th>
-                    <th className="pb-2.5 pr-4 font-medium">Status</th>
-                    <th className="pb-2.5 pr-4 font-medium">Periode</th>
-                    <th className="pb-2.5 pr-4 font-medium">Dibuat</th>
-                    <th className="pb-2.5 text-right font-medium">Aksi</th>
+                  <tr className="border-b border-border text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    <th className="pr-4 pb-2.5">Nama laporan</th>
+                    <th className="pr-4 pb-2.5">Status</th>
+                    <th className="pr-4 pb-2.5">Periode</th>
+                    <th className="pr-4 pb-2.5">Dibuat</th>
+                    <th className="pb-2.5 text-right">Aksi</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/70">
                   {reports.map((rep) => (
-                    <tr key={rep.id} className="group">
+                    <tr key={rep.id}>
                       <td className="py-3.5 pr-4">
                         <p className="font-medium text-foreground">
                           {rep.title}
                         </p>
-                        <p className="mt-0.5 text-[11px] text-muted-foreground">
+                        <p className="mt-0.5 text-xs text-muted-foreground">
                           {rep.subtitle}
                         </p>
                       </td>
@@ -278,15 +343,18 @@ export function ReportsPageClient() {
           </section>
 
           {/* Right: Buat Laporan Manual */}
-          <section className="h-fit rounded-xl border border-border bg-card p-5 xl:col-span-4">
-            <h3 className="text-[15px] font-semibold tracking-tight text-foreground">
+          <section className="h-fit min-w-0 rounded-xl border border-border bg-card p-4 sm:p-5 xl:col-span-4">
+            <h2 className="text-[15px] font-semibold tracking-tight text-foreground">
               Buat Laporan Manual
-            </h3>
+            </h2>
             <p className="mt-0.5 text-xs text-muted-foreground">
               Ekspor data audit langsung dari Supabase
             </p>
 
-            <form onSubmit={handleCreateManualReport} className="mt-5 space-y-4">
+            <form
+              onSubmit={handleCreateManualReport}
+              className="mt-5 space-y-4"
+            >
               <div className="space-y-1.5">
                 <Label className="text-xs font-medium text-foreground">
                   Periode
@@ -347,7 +415,9 @@ export function ReportsPageClient() {
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
-                    <SelectItem value="csv">CSV Audit (Excel siap buka)</SelectItem>
+                    <SelectItem value="csv">
+                      CSV Audit (Excel siap buka)
+                    </SelectItem>
                     <SelectItem value="telegram">
                       Kirim Ringkasan ke Telegram Bot
                     </SelectItem>
@@ -356,7 +426,7 @@ export function ReportsPageClient() {
               </div>
 
               {statusMessage && (
-                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-3 py-2 text-xs text-[#047857] dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-300">
+                <div className="flex items-center gap-2 rounded-lg border border-emerald-200 bg-[#ECFDF5] px-3 py-2 text-xs text-[#065F46] dark:border-emerald-900/60 dark:bg-emerald-950/50 dark:text-emerald-200">
                   <CheckCircle2 className="size-3.5 shrink-0" />
                   <span>{statusMessage}</span>
                 </div>

@@ -81,14 +81,14 @@ export function AnalyticsPageClient() {
       range={range}
       onRangeChange={setRange}
     >
-      <div className="space-y-6">
+      <div className="space-y-6 sm:space-y-7">
         {/* Header */}
         <div className="flex flex-col justify-between gap-3 sm:flex-row sm:items-end">
-          <div>
-            <h2 className="text-[22px] font-semibold tracking-tight text-foreground">
+          <div className="min-w-0">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-foreground sm:text-[26px]">
               Analisis Energi
-            </h2>
-            <p className="mt-1 text-xs text-muted-foreground">
+            </h1>
+            <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               Perbandingan konsumsi {overview.metrics.label.toLowerCase()} ·
               Virtual CT non-prioritas:{" "}
               <span className="font-mono font-medium text-foreground">
@@ -101,10 +101,10 @@ export function AnalyticsPageClient() {
             variant="outline"
             size="sm"
             onClick={handleExportCsv}
-            className="h-8 gap-1.5 self-start rounded-lg border-border bg-card text-xs font-medium sm:self-auto"
+            className="h-9 gap-1.5 self-start rounded-lg border-border bg-card px-3.5 text-xs font-medium sm:self-auto"
           >
             <Download className="size-3.5" />
-            <span>Export</span>
+            <span>Ekspor CSV</span>
           </Button>
         </div>
 
