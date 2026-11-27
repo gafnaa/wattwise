@@ -1,10 +1,12 @@
 import { connection, NextResponse } from "next/server";
+import { getAiProviderConfig } from "@/lib/ai/advisor";
 import { db } from "@/lib/db";
 import { getActiveRfModel } from "@/lib/ml/classifier";
 
 export async function GET() {
   await connection();
   const model = getActiveRfModel();
+  const aiConfig = getAiProviderConfig();
   let database: "connected" | "demo-fallback" = "demo-fallback";
 
   try {
@@ -25,6 +27,11 @@ export async function GET() {
       standard: model.standard,
       nEstimators: model.nEstimators,
       testAccuracy: model.metrics?.testAccuracy ?? null,
+    },
+    aiAdvisor: {
+      configured: aiConfig.configured,
+      provider: aiConfig.provider,
+      model: aiConfig.model,
     },
     telegram: {
       configured: Boolean(

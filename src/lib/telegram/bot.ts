@@ -49,6 +49,34 @@ export async function sendTelegramMessage(
     };
 
     if (!res.ok || !json.ok) {
+      // Jika Markdown dari LLM mengandung karakter tak seimbang, kirim ulang sebagai plain text
+      if (json.description?.toLowerCase().includes("can't parse entities")) {
+        const plainRes = await fetch(
+          `https://api.telegram.org/bot${token}/sendMessage`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              chat_id: targetChatId,
+              text: params.text,
+            }),
+          }
+        );
+        const plainJson = (await plainRes.json().catch(() => ({}))) as {
+          ok?: boolean;
+          description?: string;
+          result?: { message_id?: number };
+        };
+        if (plainRes.ok && plainJson.ok) {
+          return {
+            ok: true,
+            mode: "live",
+            chatId: targetChatId,
+            messageId: plainJson.result?.message_id,
+          };
+        }
+      }
+
       return {
         ok: false,
         mode: "live",

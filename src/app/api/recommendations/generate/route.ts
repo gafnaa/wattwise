@@ -1,5 +1,7 @@
 import { NextResponse } from "next/server";
+import { generateGroundedAiRecommendations } from "@/lib/ai/advisor";
 import { calculateCostIdr } from "@/lib/audit/calculator";
+import { computePeakIdleWindows } from "@/lib/audit/peak-idle";
 import {
   generateMachineRecommendations,
   type MachineAuditStats,
@@ -9,12 +11,18 @@ import { db } from "@/lib/db";
 import { INITIAL_MACHINES } from "@/lib/mock-dashboard-data";
 
 /**
- * Mengevaluasi sesi idle 30 hari terakhir per mesin lalu menghasilkan
- * rekomendasi penghematan baru (deduplikasi terhadap status PENDING yang ada).
+ * Pipeline 3-Tahap WattWise:
+ * 1) Random Forest (telah menyimpan sesi status mesin ke DB)
+ * 2) Rule-Based Calculator + Peak Idle Window (hitung kWh, Rp, jam rawan idle)
+ * 3) Generative AI Advisor (saran operasional kontekstual + fallback otomatis ke rule-based)
  */
-export async function POST() {
+export async function POST(request: Request) {
   const session = await getCurrentSession();
   const since = new Date(Date.now() - 30 * 86_400_000);
+  const rawBody = (await request.json().catch(() => ({}))) as {
+    replacePending?: boolean;
+  };
+  const replacePending = Boolean(rawBody?.replacePending);
 
   try {
     const workshop = session?.workshopId
@@ -22,7 +30,7 @@ export async function POST() {
       : await db.workshop.findFirst({ orderBy: { createdAt: "asc" } });
 
     if (!workshop) {
-      return buildDemoGeneratedResponse();
+      return await buildDemoGeneratedResponse();
     }
 
     const tariffIdr = Number(workshop.tariffIdrPerKwh);
@@ -38,11 +46,11 @@ export async function POST() {
       }),
       db.actionRecommendation.findMany({
         where: { workshopId: workshop.id, status: "PENDING" },
-        select: { machineId: true },
+        select: { id: true, machineId: true },
       }),
     ]);
 
-    const pendingMachineIds = new Set(existingPending.map((r) => r.machineId));
+    const peakAnalysis = computePeakIdleWindows(sessions);
 
     const stats: MachineAuditStats[] = machines.map((m) => {
       const mSessions = sessions.filter((s) => s.machineId === m.id);
@@ -63,7 +71,30 @@ export async function POST() {
       };
     });
 
-    const generated = generateMachineRecommendations(stats);
+    const ruleBased = generateMachineRecommendations(stats);
+    const aiResult = await generateGroundedAiRecommendations({
+      workshopName: workshop.name,
+      tariffIdrPerKwh: tariffIdr,
+      workingDaysPerMonth: workshop.workingDaysPerMonth,
+      stats,
+      peakIdleByMachineId: peakAnalysis.byMachineId,
+      ruleBasedFallback: ruleBased,
+    });
+
+    if (replacePending && existingPending.length > 0) {
+      await db.actionRecommendation.deleteMany({
+        where: {
+          workshopId: workshop.id,
+          status: "PENDING",
+          source: { in: ["AI_RULE", "AI_LLM"] },
+        },
+      });
+    }
+
+    const pendingMachineIds = replacePending
+      ? new Set<string>()
+      : new Set(existingPending.map((r) => r.machineId));
+
     const created: Array<{
       id: string;
       machineCode: string;
@@ -71,9 +102,11 @@ export async function POST() {
       recommendationText: string;
       estimatedSavingIdrMonth: number;
       priority: string;
+      source: string;
+      peakIdleWindow: string | null;
     }> = [];
 
-    for (const rec of generated) {
+    for (const rec of aiResult.recommendations) {
       if (pendingMachineIds.has(rec.machineId)) continue;
       const row = await db.actionRecommendation.create({
         data: {
@@ -81,7 +114,7 @@ export async function POST() {
           machineId: rec.machineId,
           recommendationText: rec.recommendationText,
           status: "PENDING",
-          source: "AI_RULE",
+          source: aiResult.source,
           estimatedSavingIdr: rec.estimatedSavingIdrMonth,
         },
       });
@@ -92,22 +125,37 @@ export async function POST() {
         recommendationText: rec.recommendationText,
         estimatedSavingIdrMonth: rec.estimatedSavingIdrMonth,
         priority: rec.priority,
+        source: aiResult.source,
+        peakIdleWindow:
+          peakAnalysis.byMachineId[rec.machineId]?.peakWindowLabel ?? null,
       });
     }
 
     return NextResponse.json({
       ok: true,
       dataSource: "database",
+      aiSource: aiResult.source,
+      aiProvider: aiResult.provider,
+      aiModel: aiResult.model,
+      workshopPeakIdleWindow: peakAnalysis.workshopPeakWindowLabel,
       evaluatedMachines: stats.length,
       newlyCreatedCount: created.length,
-      recommendations: created.length > 0 ? created : generated,
+      recommendations:
+        created.length > 0
+          ? created
+          : aiResult.recommendations.map((rec) => ({
+              ...rec,
+              source: aiResult.source,
+              peakIdleWindow:
+                peakAnalysis.byMachineId[rec.machineId]?.peakWindowLabel ?? null,
+            })),
     });
   } catch {
-    return buildDemoGeneratedResponse();
+    return await buildDemoGeneratedResponse();
   }
 }
 
-function buildDemoGeneratedResponse() {
+async function buildDemoGeneratedResponse() {
   const demoStats: MachineAuditStats[] = INITIAL_MACHINES.map((m) => ({
     machineId: m.id,
     machineCode: m.code,
@@ -130,12 +178,24 @@ function buildDemoGeneratedResponse() {
     startupCountMonth: m.startupCountMonth,
   }));
 
-  const generated = generateMachineRecommendations(demoStats);
+  const ruleBased = generateMachineRecommendations(demoStats);
+  const aiResult = await generateGroundedAiRecommendations({
+    workshopName: "Area Produksi Furnitur — Sukoharjo",
+    tariffIdrPerKwh: 1444.7,
+    workingDaysPerMonth: 26,
+    stats: demoStats,
+    peakIdleByMachineId: {},
+    ruleBasedFallback: ruleBased,
+  });
+
   return NextResponse.json({
     ok: true,
     dataSource: "demo",
+    aiSource: aiResult.source,
+    aiProvider: aiResult.provider,
+    aiModel: aiResult.model,
     evaluatedMachines: demoStats.length,
     newlyCreatedCount: 0,
-    recommendations: generated,
+    recommendations: aiResult.recommendations,
   });
 }
