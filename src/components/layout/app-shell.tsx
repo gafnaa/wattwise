@@ -120,6 +120,21 @@ export function AppShell({
   const { theme, setTheme } = useWattWiseTheme();
   const [collapsed, setCollapsed] = React.useState(false);
   const [mobileOpen, setMobileOpen] = React.useState(false);
+
+  // Kunci scroll latar & dukung tombol Escape saat mobile drawer terbuka
+  React.useEffect(() => {
+    if (!mobileOpen) return;
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMobileOpen(false);
+    };
+    window.addEventListener("keydown", onKeyDown);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKeyDown);
+    };
+  }, [mobileOpen]);
   const [liveMeta, setLiveMeta] = React.useState<{
     workshopName: string;
     username: string;
@@ -473,154 +488,181 @@ export function AppShell({
           </div>
       </aside>
 
-      {/* Mobile Full Drawer */}
-      {mobileOpen && (
-        <div className="fixed inset-0 z-50 flex lg:hidden">
-          <div
-            className="fixed inset-0 bg-black/45 backdrop-blur-[2px]"
-            onClick={() => setMobileOpen(false)}
-          />
-          <div className="relative z-10 flex h-full w-[280px] max-w-[85vw] flex-col bg-sidebar shadow-2xl">
-            <div className="flex h-16 items-center justify-between border-b border-border px-4">
-              <Link
-                href="/dashboard"
-                onClick={() => setMobileOpen(false)}
-                className="flex items-center gap-2.5"
-              >
-                <div className="flex size-8 items-center justify-center rounded-lg bg-[#059669] text-white">
-                  <Zap className="size-4 fill-white" />
-                </div>
-                <div className="leading-tight">
-                  <p className="text-sm font-semibold text-foreground">
-                    WattWise
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    Energy Intelligence
-                  </p>
-                </div>
-              </Link>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                onClick={() => setMobileOpen(false)}
-                className="size-9"
-                aria-label="Tutup menu"
-              >
-                <X className="size-4" />
-              </Button>
-            </div>
-
-            <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
-              <div>
-                <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  Menu Utama
-                </p>
-                <div className="space-y-1">
-                  {MAIN_NAV.map((item) => {
-                    const Icon = item.icon;
-                    const active = isNavActive(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileOpen(false)}
-                        className={`flex min-h-[44px] items-center justify-between rounded-lg px-3 py-2 text-sm font-medium ${
-                          active
-                            ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
-                            : "text-zinc-700 hover:bg-muted dark:text-zinc-300"
-                        }`}
-                      >
-                        <span className="flex items-center gap-3">
-                          <Icon className="size-4 shrink-0" />
-                          <span>{item.label}</span>
-                        </span>
-                        {"showBadge" in item &&
-                          item.showBadge &&
-                          effectivePending > 0 && (
-                            <span className="rounded-full bg-[#F5F3FF] px-2 py-0.5 text-xs font-semibold text-[#6D28D9] dark:bg-violet-950 dark:text-violet-300">
-                              {effectivePending}
-                            </span>
-                          )}
-                      </Link>
-                    );
-                  })}
-                </div>
+      {/* Mobile Full Drawer — smooth spring slide-in + backdrop blur fade */}
+      <div
+        aria-hidden={!mobileOpen}
+        className={`fixed inset-0 z-50 flex transition-[visibility] duration-300 lg:hidden ${
+          mobileOpen
+            ? "pointer-events-auto visible"
+            : "pointer-events-none invisible"
+        }`}
+      >
+        <div
+          className={`fixed inset-0 bg-zinc-950/45 backdrop-blur-xs transition-opacity duration-300 ease-out ${
+            mobileOpen ? "opacity-100" : "opacity-0"
+          }`}
+          onClick={() => setMobileOpen(false)}
+        />
+        <aside
+          className={`relative z-10 flex h-full w-[284px] max-w-[86vw] flex-col border-r border-border/70 bg-sidebar/95 shadow-2xl backdrop-blur-xl transition-transform duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] will-change-transform ${
+            mobileOpen ? "translate-x-0" : "-translate-x-full"
+          }`}
+        >
+          <div className="flex h-16 items-center justify-between border-b border-border/70 px-4">
+            <Link
+              href="/dashboard"
+              onClick={() => setMobileOpen(false)}
+              className="flex items-center gap-2.5"
+            >
+              <div className="flex size-8 items-center justify-center rounded-lg bg-[#059669] text-white shadow-xs">
+                <Zap className="size-4 fill-white" />
               </div>
-
-              <div>
-                <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                  Manajemen
+              <div className="leading-tight">
+                <p className="text-sm font-semibold text-foreground">
+                  WattWise
                 </p>
-                <div className="space-y-1">
-                  {MANAGEMENT_NAV.map((item) => {
-                    const Icon = item.icon;
-                    const active = isNavActive(item.href);
-                    return (
-                      <Link
-                        key={item.href}
-                        href={item.href}
-                        onClick={() => setMobileOpen(false)}
-                        className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium ${
-                          active
-                            ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
-                            : "text-zinc-700 hover:bg-muted dark:text-zinc-300"
-                        }`}
-                      >
+                <p className="text-xs text-muted-foreground">
+                  Energy Intelligence
+                </p>
+              </div>
+            </Link>
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              onClick={() => setMobileOpen(false)}
+              className="size-9 rounded-lg text-muted-foreground transition-transform active:scale-90"
+              aria-label="Tutup menu"
+            >
+              <X className="size-4" />
+            </Button>
+          </div>
+
+          <nav className="flex-1 space-y-5 overflow-y-auto px-3 py-4">
+            <div>
+              <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Menu Utama
+              </p>
+              <div className="space-y-1">
+                {MAIN_NAV.map((item, idx) => {
+                  const Icon = item.icon;
+                  const active = isNavActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      style={{
+                        transitionDelay: mobileOpen ? `${45 + idx * 28}ms` : "0ms",
+                      }}
+                      className={`flex min-h-[44px] items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-[transform,opacity,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                        mobileOpen
+                          ? "translate-x-0 opacity-100"
+                          : "-translate-x-3 opacity-0"
+                      } ${
+                        active
+                          ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
+                          : "text-zinc-700 hover:bg-muted dark:text-zinc-300"
+                      }`}
+                    >
+                      <span className="flex items-center gap-3">
                         <Icon className="size-4 shrink-0" />
                         <span>{item.label}</span>
-                      </Link>
-                    );
-                  })}
-                </div>
+                      </span>
+                      {"showBadge" in item &&
+                        item.showBadge &&
+                        effectivePending > 0 && (
+                          <span className="rounded-full bg-[#F5F3FF] px-2 py-0.5 text-xs font-semibold text-[#6D28D9] dark:bg-violet-950 dark:text-violet-300">
+                            {effectivePending}
+                          </span>
+                        )}
+                    </Link>
+                  );
+                })}
               </div>
-            </nav>
-
-            <div className="space-y-3 border-t border-border p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
-              <div className="grid grid-cols-2 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
-                <button
-                  type="button"
-                  onClick={() => setTheme("light")}
-                  className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-md font-medium ${
-                    theme === "light"
-                      ? "bg-card text-foreground shadow-2xs"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Sun className="size-3.5" />
-                  <span>Terang</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setTheme("dark")}
-                  className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-md font-medium ${
-                    theme === "dark"
-                      ? "bg-card text-foreground shadow-2xs"
-                      : "text-muted-foreground"
-                  }`}
-                >
-                  <Moon className="size-3.5" />
-                  <span>Gelap</span>
-                </button>
-              </div>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handleLogout}
-                className="h-10 w-full justify-center gap-2 text-xs text-[#DC2626]"
-              >
-                <LogOut className="size-3.5" />
-                <span>Keluar ({effectiveOwner})</span>
-              </Button>
             </div>
+
+            <div>
+              <p className="mb-1.5 px-2.5 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                Manajemen
+              </p>
+              <div className="space-y-1">
+                {MANAGEMENT_NAV.map((item, idx) => {
+                  const Icon = item.icon;
+                  const active = isNavActive(item.href);
+                  return (
+                    <Link
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setMobileOpen(false)}
+                      style={{
+                        transitionDelay: mobileOpen
+                          ? `${170 + idx * 28}ms`
+                          : "0ms",
+                      }}
+                      className={`flex min-h-[44px] items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-[transform,opacity,background-color] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                        mobileOpen
+                          ? "translate-x-0 opacity-100"
+                          : "-translate-x-3 opacity-0"
+                      } ${
+                        active
+                          ? "bg-[#ECFDF5] text-[#047857] dark:bg-emerald-950/70 dark:text-emerald-300"
+                          : "text-zinc-700 hover:bg-muted dark:text-zinc-300"
+                      }`}
+                    >
+                      <Icon className="size-4 shrink-0" />
+                      <span>{item.label}</span>
+                    </Link>
+                  );
+                })}
+              </div>
+            </div>
+          </nav>
+
+          <div className="space-y-3 border-t border-border/70 p-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+            <div className="grid grid-cols-2 rounded-lg border border-border bg-muted/60 p-0.5 text-xs">
+              <button
+                type="button"
+                onClick={() => setTheme("light")}
+                className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${
+                  theme === "light"
+                    ? "bg-card text-foreground shadow-2xs"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <Sun className="size-3.5" />
+                <span>Terang</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => setTheme("dark")}
+                className={`flex min-h-[38px] items-center justify-center gap-1.5 rounded-md font-medium transition-colors ${
+                  theme === "dark"
+                    ? "bg-card text-foreground shadow-2xs"
+                    : "text-muted-foreground"
+                }`}
+              >
+                <Moon className="size-3.5" />
+                <span>Gelap</span>
+              </button>
+            </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleLogout}
+              className="h-10 w-full justify-center gap-2 text-xs text-[#DC2626]"
+            >
+              <LogOut className="size-3.5" />
+              <span>Keluar ({effectiveOwner})</span>
+            </Button>
           </div>
-        </div>
-      )}
+        </aside>
+      </div>
 
       {/* Main Content Column */}
       <div className="flex min-w-0 flex-1 flex-col">
-        {/* Compact Top Bar (Zero duplicate page heading!) */}
-        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-border bg-card/95 px-4 backdrop-blur-md sm:h-16 sm:px-6 lg:px-7">
+        {/* Frosted Glass Top Navbar */}
+        <header className="sticky top-0 z-30 flex h-14 shrink-0 items-center justify-between gap-2 border-b border-zinc-200/70 bg-white/68 px-4 shadow-[inset_0_1px_0_rgba(255,255,255,0.65),0_8px_24px_-16px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 sm:h-16 sm:px-6 lg:px-7 dark:border-zinc-800/70 dark:bg-zinc-950/68 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_8px_24px_-16px_rgba(0,0,0,0.65)]">
           <div className="flex min-w-0 items-center gap-2.5">
             {/* Desktop Sidebar Toggle — ALWAYS outside sidebar card in one steady spot */}
             <Tooltip>
@@ -726,9 +768,9 @@ export function AppShell({
                   }
                 }}
               >
-                <SelectTrigger className="h-9 w-[124px] rounded-lg border-border bg-card text-xs font-medium sm:w-[144px]">
+                <SelectTrigger className="h-9 w-[124px] rounded-lg border-border/80 bg-white/75 text-xs font-medium backdrop-blur-md sm:w-[144px] dark:bg-zinc-900/75">
                   <Calendar className="mr-1.5 size-3.5 shrink-0 text-muted-foreground" />
-                  <SelectValue />
+                  <SelectValue>{RANGE_LABELS[range]}</SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="month">{RANGE_LABELS.month}</SelectItem>
@@ -772,10 +814,10 @@ export function AppShell({
         </main>
       </div>
 
-      {/* Mobile Bottom Navigation Bar (Thumb-reachable, 44px+ targets) */}
+      {/* Mobile Bottom Navigation Bar — Frosted Glass */}
       <nav
         aria-label="Navigasi utama mobile"
-        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-border bg-card/95 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] backdrop-blur-md lg:hidden"
+        className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-5 border-t border-zinc-200/70 bg-white/75 px-1 pt-1 pb-[max(0.35rem,env(safe-area-inset-bottom))] shadow-[inset_0_1px_0_rgba(255,255,255,0.6),0_-8px_24px_-16px_rgba(0,0,0,0.12)] backdrop-blur-xl backdrop-saturate-150 lg:hidden dark:border-zinc-800/70 dark:bg-zinc-950/75 dark:shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_-8px_24px_-16px_rgba(0,0,0,0.6)]"
       >
         {MOBILE_BOTTOM_NAV.map((item) => {
           const Icon = item.icon;
