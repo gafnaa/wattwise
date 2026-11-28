@@ -73,7 +73,7 @@ function buildInitialEvents(
         id: `evt-${m.id}`,
         time: fmt(idx, idx * 14 + 4),
         machineName: m.name,
-        message: `Start-up terdeteksi oleh Random Forest (lonjakan arus awal)`,
+        message: "Lonjakan arus awal terdeteksi saat mesin dinyalakan",
         tone: "default",
       };
     }
@@ -338,7 +338,7 @@ export function MachinesPageClient() {
             </h1>
             <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
               {overview.machines.length} mesin di {overview.workshop.name} ·
-              Real-time SSE · Terakhir {lastUpdated}
+              Pembaruan langsung · Terakhir {lastUpdated}
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -528,8 +528,8 @@ export function MachinesPageClient() {
             </h3>
             <p className="mt-0.5 text-xs text-muted-foreground">
               {eventsFromDb
-                ? "Sesi transisi status aktual dari Random Forest (Supabase)"
-                : "Transisi status terbaru hasil klasifikasi Random Forest"}
+                ? "Riwayat perubahan kondisi mesin terbaru dari sensor aktif"
+                : "Riwayat perubahan kondisi mesin terbaru"}
             </p>
             <div className="mt-4 space-y-4">
               {events.map((ev) => (

@@ -222,7 +222,7 @@ export function EnergyConsumptionCard({
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
             {seriesSource === "database"
-              ? "Agregasi aktual Supabase"
+              ? "Data pengukuran aktual"
               : "Estimasi konsumsi"}{" "}
             ·{" "}
             {selectedMachine === "ALL"
@@ -267,9 +267,14 @@ export function EnergyConsumptionCard({
             value={selectedMachine}
             onValueChange={(v) => setSelectedMachine(v ?? "ALL")}
           >
-            <SelectTrigger className="h-8 w-[144px] rounded-lg border-border bg-card text-xs font-medium">
+            <SelectTrigger className="h-8 w-[156px] rounded-lg border-border bg-card text-xs font-medium">
               <Cpu className="mr-1.5 size-3.5 shrink-0 text-muted-foreground" />
-              <SelectValue />
+              <SelectValue>
+                {selectedMachine === "ALL"
+                  ? "Semua Mesin"
+                  : (machines.find((m) => m.code === selectedMachine)?.name ??
+                    selectedMachine)}
+              </SelectValue>
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="ALL">Semua Mesin</SelectItem>

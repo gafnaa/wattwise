@@ -229,8 +229,8 @@ export function ActionsPageClient() {
               Rekomendasi AI
             </h1>
             <p className="mt-1 text-xs text-muted-foreground sm:text-[13px]">
-              {pendingLogs.length} rekomendasi aktif · Dihasilkan dari pola
-              konsumsi 30 hari terakhir (Random Forest + Gemini AI)
+              {pendingLogs.length} rekomendasi aktif · Disusun dari pola
+              pemakaian listrik mesin selama 30 hari terakhir
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-2">
@@ -335,7 +335,7 @@ export function ActionsPageClient() {
             <Info className="mt-0.5 size-4 shrink-0" />
             <p>
               {aiBannerMsg ??
-                "Insight dihasilkan AI dari prediksi status mesin (Random Forest) dan perhitungan biaya. Bukan perintah otomatis — verifikasi kondisi lapangan sebelum bertindak."}
+                "Saran dihasilkan otomatis dari pola pemakaian daya mesin dan perhitungan biaya listrik. Bukan perintah otomatis — verifikasi kondisi lapangan sebelum bertindak."}
             </p>
           </div>
 
