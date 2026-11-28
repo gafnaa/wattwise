@@ -326,7 +326,21 @@ export function MachinesManagementClient() {
                   onValueChange={(v) => setNewType(v ?? "CNC")}
                 >
                   <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
+                    <SelectValue>
+                      {
+                        (
+                          {
+                            CNC: "CNC Router",
+                            PANEL_SAW: "Panel Saw",
+                            EDGE_BANDER: "Edge Bander",
+                            DUST_COLLECTOR: "Dust Collector",
+                            BORING: "Boring",
+                            COMPRESSOR: "Compressor",
+                            OTHER: "Lainnya",
+                          } as Record<string, string>
+                        )[newType] ?? newType
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CNC">CNC Router</SelectItem>
@@ -423,7 +437,8 @@ export function MachinesManagementClient() {
           <DialogHeader>
             <DialogTitle>Edit Mesin — {editing?.code}</DialogTitle>
             <DialogDescription>
-              Perubahan akan langsung tersimpan ke database Supabase.
+              Perubahan profil dan batas peringatan mesin akan langsung
+              diterapkan.
             </DialogDescription>
           </DialogHeader>
           {editing && (
@@ -481,7 +496,19 @@ export function MachinesManagementClient() {
                   }
                 >
                   <SelectTrigger className="h-9 text-xs">
-                    <SelectValue />
+                    <SelectValue>
+                      {
+                        (
+                          {
+                            CRITICAL: "Kritis (Sensor Wajib)",
+                            LEVERAGE_POWER: "Daya Tinggi",
+                            LEVERAGE_TIME: "Durasi Panjang",
+                            NONCRITICAL: "Non-Kritis (Virtual CT)",
+                          } as Record<string, string>
+                        )[editing.portfolioQuadrant] ??
+                        editing.portfolioQuadrant
+                      }
+                    </SelectValue>
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="CRITICAL">

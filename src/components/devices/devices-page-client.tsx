@@ -464,7 +464,18 @@ export function DevicesPageClient() {
                     onValueChange={(v) => setSelectedMachineId(v ?? "NONE")}
                   >
                     <SelectTrigger className="h-9 text-xs">
-                      <SelectValue />
+                      <SelectValue>
+                        {selectedMachineId === "NONE"
+                          ? "Belum dipasangkan"
+                          : (() => {
+                              const found = machines.find(
+                                (m) => m.id === selectedMachineId
+                              );
+                              return found
+                                ? `${found.name} (${found.code})`
+                                : "Pilih mesin";
+                            })()}
+                      </SelectValue>
                     </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="NONE">Belum dipasangkan</SelectItem>

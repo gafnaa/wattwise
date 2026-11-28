@@ -27,7 +27,7 @@ export function AiInsightCard({
             <DataSourceBadge kind="rekomendasi-ai" />
           </div>
           <p className="mt-0.5 text-xs text-muted-foreground">
-            Temuan idle berdasarkan klasifikasi status mesin &amp; AI Advisor
+            Temuan pemborosan listrik saat mesin menyala tanpa beban
           </p>
         </div>
         <Link
@@ -43,9 +43,9 @@ export function AiInsightCard({
       <div className="mt-4 flex items-start gap-2.5 rounded-lg border border-violet-200/80 bg-[#F5F3FF] px-3 py-2.5 text-xs leading-relaxed text-[#5B21B6] dark:border-violet-900/60 dark:bg-violet-950/40 dark:text-violet-200">
         <Info className="mt-0.5 size-3.5 shrink-0" />
         <p>
-          Insight dihasilkan AI dari prediksi status mesin (Random Forest) dan
-          perhitungan biaya. Bukan perintah otomatis — verifikasi kondisi
-          lapangan sebelum bertindak.
+          Saran dihasilkan otomatis dari pola penggunaan daya mesin dan
+          perhitungan biaya listrik. Bukan perintah otomatis — verifikasi
+          kondisi lapangan sebelum bertindak.
         </p>
       </div>
 

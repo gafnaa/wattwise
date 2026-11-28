@@ -149,7 +149,7 @@ export function MachineTelemetryDialog({
         {loading ? (
           <div className="flex items-center justify-center py-14 text-xs text-muted-foreground">
             <Loader2 className="mr-2 size-4 animate-spin" />
-            Mengambil telemetri 24 jam terakhir dari Supabase...
+            Memuat riwayat daya 24 jam terakhir...
           </div>
         ) : error || !payload ? (
           <div className="rounded-lg border border-border bg-muted/30 px-4 py-8 text-center text-xs text-muted-foreground">
@@ -272,7 +272,7 @@ export function MachineTelemetryDialog({
                     <th className="px-3 py-2">Waktu</th>
                     <th className="px-3 py-2 text-right">Daya</th>
                     <th className="px-3 py-2 text-right">Tegangan / Arus</th>
-                    <th className="px-3 py-2">Klasifikasi RF</th>
+                    <th className="px-3 py-2">Status Mesin</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/70">

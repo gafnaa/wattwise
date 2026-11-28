@@ -72,12 +72,22 @@ export function DashboardShell() {
   React.useEffect(() => {
     let cancelled = false;
 
-    fetch(`/api/dashboard/overview?range=${range}`, { cache: "no-store" })
-      .then((res) => (res.ok ? res.json() : null))
-      .then((data: DashboardOverviewResponse | null) => {
+    Promise.all([
+      fetch(`/api/dashboard/overview?range=${range}`, { cache: "no-store" }).then(
+        (res) =>
+          res.ok ? (res.json() as Promise<DashboardOverviewResponse>) : null
+      ),
+      fetch("/api/auth/me", { cache: "no-store" }).then((res) =>
+        res.ok
+          ? (res.json() as Promise<{ user?: { fullName?: string } | null }>)
+          : null
+      ),
+    ])
+      .then(([data, me]) => {
         if (!cancelled) {
           const now = new Date();
-          setGreeting(`${getGreetingFromDate(now)}, Pemilik Pabrik`);
+          const activeName = me?.user?.fullName?.trim() || "Pemilik Pabrik";
+          setGreeting(`${getGreetingFromDate(now)}, ${activeName}`);
           if (data?.metrics) {
             setOverview(data);
             setLastUpdatedLabel(

@@ -54,7 +54,7 @@ export function SettingsShell() {
   const [health, setHealth] = React.useState<HealthPayload | null>(null);
   const [saving, setSaving] = React.useState(false);
   const [lastSavedText, setLastSavedText] = React.useState(
-    "Sinkron dengan Supabase PostgreSQL"
+    "Tersimpan & tersinkron ke server"
   );
   const [testingTg, setTestingTg] = React.useState(false);
   const [tgFeedback, setTgFeedback] = React.useState<string | null>(null);
@@ -416,34 +416,34 @@ export function SettingsShell() {
             {[
               {
                 icon: Database,
-                title: "Supabase PostgreSQL",
+                title: "Penyimpanan Data Bengkel",
                 detail:
                   health?.database === "connected"
-                    ? "Terhubung via Prisma 7 + Pooler"
-                    : "Mode fallback demo",
+                    ? "Terhubung ke server data utama"
+                    : "Menggunakan data simulasi sementara",
                 ok: health?.database === "connected",
               },
               {
                 icon: Cpu,
-                title: "Random Forest Classifier",
+                title: "Deteksi Status Mesin Otomatis",
                 detail: health
-                  ? `${health.mlModel.standard} · ${health.mlModel.nEstimators} decision trees`
-                  : "ISO 14955-5:2020",
+                  ? "Aktif membedakan status Working, Idle, Start-up, & Off"
+                  : "Standar pemantauan aktif",
                 ok: true,
               },
               {
                 icon: Sparkles,
-                title: "Generative AI Advisor",
+                title: "Asisten Rekomendasi AI",
                 detail: health?.aiAdvisor?.configured
-                  ? `${health.aiAdvisor.provider} · ${health.aiAdvisor.model}`
-                  : "Rule-based fallback aktif",
+                  ? "Aktif menyusun saran penghematan & tanya-jawab bengkel"
+                  : "Menggunakan saran standar bawaan",
                 ok: Boolean(health?.aiAdvisor?.configured),
               },
               {
                 icon: ShieldCheck,
-                title: "Telegram Bot 2 Arah",
+                title: "Notifikasi & Bot Telegram",
                 detail: health?.telegram.configured
-                  ? "@wattwise_smart_bot aktif (alert + chat bebas AI)"
+                  ? "@wattwise_smart_bot aktif (peringatan idle & laporan harian)"
                   : "Token atau Chat ID belum lengkap",
                 ok: Boolean(health?.telegram.configured),
               },

@@ -68,7 +68,7 @@ export function EnergyPerMachineCard({
           onValueChange={(v) => setUnitMode(v === "idr" ? "idr" : "kwh")}
         >
           <SelectTrigger className="h-8 w-[84px] shrink-0 rounded-lg border-border bg-card text-xs font-medium">
-            <SelectValue />
+            <SelectValue>{unitMode === "idr" ? "Rp" : "kWh"}</SelectValue>
           </SelectTrigger>
           <SelectContent>
             <SelectItem value="kwh">kWh</SelectItem>
